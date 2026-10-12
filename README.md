@@ -22,6 +22,9 @@ insight doctor                     # checks packages, GPU, Hugging Face login an
 
 Reading `.svs`, `.ndpi` or `.mrxs` slides needs OpenSlide (`pip install openslide-bin` or your OS package).
 
+Hospitals and clusters can use the Docker image instead (GPU and CPU variants, optional offline build with weights):
+see [docker/README.md](docker/README.md).
+
 ### Weights and access
 
 | Component | Source | Access |

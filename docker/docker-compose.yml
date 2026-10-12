@@ -1,0 +1,31 @@
+# Host INSIGHT for collaborators with `insight serve` (GPU). Collaborators run the pipeline on their own data and use
+#   insight run ... --backend http://<this-host>:8080        (with INSIGHT_SERVER_TOKEN set to the same token)
+#
+#   export INSIGHT_SERVER_TOKEN=$(openssl rand -hex 24)
+#   export HF_TOKEN=...            # your approved Hugging Face token (first start downloads the weights)
+#   docker compose -f docker/docker-compose.yml up -d
+services:
+  insight-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: insight:gpu
+    command: ["serve", "--host", "0.0.0.0", "--port", "8080", "--preload", "insight-crc"]
+    ports:
+      - "8080:8080"           # put a TLS reverse proxy in front if this is reachable beyond your network
+    environment:
+      - INSIGHT_SERVER_TOKEN
+      - HF_TOKEN
+    volumes:
+      - insight-cache:/cache
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  insight-cache:
