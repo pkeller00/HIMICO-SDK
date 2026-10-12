@@ -1,0 +1,27 @@
+# INSIGHT pipeline configuration. Every field is optional; these are the defaults.
+output: insight_runs          # workspace = <output>/<experiment>/run_<run>/<variant>
+experiment: my_cohort
+run: 1
+description: ""
+model: insight-crc            # see `insight models`
+device: auto                  # auto | cuda | cuda:1 | mps | cpu
+batch_size: 64
+workers: 4
+mpp: null                     # fallback microns-per-pixel if a slide does not record it
+weights_dir: null             # folder with local weights; otherwise downloaded from Hugging Face
+backend: null                 # e.g. http://gpu-server:8080 to run the model on an `insight serve` server
+
+mask:
+  source: grandqc             # or a folder of <slide>.png masks you made yourself
+  qc_mpp: 1.5
+  keep_classes: [1, 2, 5, 6]  # GrandQC: normal, fold, edge/air bubble, out-of-focus
+
+tissue:
+  keep: [TUM, STR, LYM, MUC]  # CRC tissue types used for features
+  write_overlay: true
+
+features:
+  model: uni                  # UNI needs your own approved access: huggingface.co/MahmoodLab/UNI
+
+graph:
+  dthresh: 4000

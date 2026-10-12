@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+build/
+dist/
+.DS_Store
+# never commit weights, slides or results
+*.safetensors
+*.pth
+*.bin
+*.g
+*.svs
+*.tif
+*.tiff
+*.ndpi
+*.mrxs
+insight_runs/
+weights/
