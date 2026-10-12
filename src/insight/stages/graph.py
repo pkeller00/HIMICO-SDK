@@ -4,7 +4,7 @@ Slide graph (as SlideGraph+ / the INSIGHT pipeline): nodes are patches, edges jo
 `dthresh` pixels (top-left corners at the feature resolution).
 
 Reproducibility: patches lie on a square grid, where Delaunay triangulation is not unique (either diagonal of a square
-is valid). SciPy <= 1.12 (Qhull 2019, used to train INSIGHT) and SciPy >= 1.13 break these ties differently, so about 12%
+is valid). SciPy <= 1.12 (as used to build the INSIGHT training graphs) and SciPy >= 1.13 break these ties differently, so about 12%
 of edges, nearly all 45-degree diagonals, differ. Effect on the public TCGA example: risk 0.23708 vs 0.23777, per-patch
 Spearman 0.9965. SciPy <= 1.12 cannot be used with TIAToolbox 2 (it needs NumPy 2); the SciPy version is recorded in
 environment.json.
