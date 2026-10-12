@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling>=1.24"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "insight-crc"
@@ -50,5 +50,9 @@ Model = "https://github.com/pkeller00/INSIGHT"
 Paper = "https://arxiv.org/abs/2512.22262"
 Weights = "https://huggingface.co/pkeller01/INSIGHT"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/insight"]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# Qhull licence terms require COPYING.txt to travel with every copy
+"insight._qhull" = ["COPYING.txt", "README.md", "README.scipy"]

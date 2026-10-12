@@ -39,7 +39,11 @@ RUN if [ -n "$TORCH_INDEX" ]; then pip install $TORCH_INDEX "torch>=2.5" "torchv
 WORKDIR /opt/insight
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
-RUN pip install ".[viewer]" "openslide-bin" && insight --version
+# a C compiler is needed only to build the vendored Qhull extension; removed afterwards
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && pip install ".[viewer]" "openslide-bin" && insight --version \
+    && python -c "import insight._qhull_legacy" \
+    && apt-get purge -y gcc libc6-dev && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 # Non-root user; /data (slides, mount read-only), /output (workspaces), /cache (downloaded weights)
 RUN useradd --create-home --uid 1000 insight && mkdir -p /data /output /cache/hf && chown -R insight /output /cache

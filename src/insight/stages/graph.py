@@ -4,10 +4,11 @@ Slide graph (as SlideGraph+ / the INSIGHT pipeline): nodes are patches, edges jo
 `dthresh` pixels (top-left corners at the feature resolution).
 
 Reproducibility: patches lie on a square grid, where Delaunay triangulation is not unique (either diagonal of a square
-is valid). SciPy <= 1.12 (as used to build the INSIGHT training graphs) and SciPy >= 1.13 break these ties differently, so about 12%
-of edges, nearly all 45-degree diagonals, differ. Effect on the public TCGA example: risk 0.23708 vs 0.23777, per-patch
-Spearman 0.9965. SciPy <= 1.12 cannot be used with TIAToolbox 2 (it needs NumPy 2); the SciPy version is recorded in
-environment.json.
+is valid) and the choice depends on floating-point rounding. INSIGHT's training graphs were built with Qhull 2019.1
+compiled without fused multiply-add; newer SciPy wheels contract multiply-adds and pick different diagonals (about 12%
+of edges). The SDK therefore triangulates with its own copy of that Qhull (insight._qhull_legacy, compiled with
+-ffp-contract=off), which reproduces the training edges exactly. If the extension is missing it falls back to SciPy and
+warns.
 
 Patient graph: the slide graphs of one patient are concatenated into one graph (no edges between slides), so the model
 sees the patient as a whole. As in the INSIGHT training pipeline, each later slide's coordinates are offset by the
@@ -16,12 +17,33 @@ maps can be recovered exactly.
 """
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
 import torch
 from scipy.spatial import Delaunay, KDTree
+
+log = logging.getLogger("insight")
+try:
+    from .. import _qhull_legacy
+except ImportError:      # pragma: no cover  (extension not built)
+    _qhull_legacy = None
+_warned = False
+
+
+def delaunay_simplices(coords: np.ndarray) -> np.ndarray:
+    """[M, 3] triangles: vendored Qhull 2019.1 (training-identical) or SciPy as a fallback."""
+    global _warned
+    pts = np.ascontiguousarray(coords, dtype=np.float64)
+    if _qhull_legacy is not None:
+        return np.frombuffer(_qhull_legacy.delaunay(pts.tobytes()), dtype=np.int32).reshape(-1, 3)
+    if not _warned:
+        log.warning("insight._qhull_legacy is not built; using SciPy's Delaunay, whose ties on the patch grid can "
+                    "differ from the training graphs (reinstall insight-crc with a C compiler available)")
+        _warned = True
+    return Delaunay(pts).simplices
 
 
 def connect_patches(coords: np.ndarray, dthresh: float) -> np.ndarray:
@@ -36,7 +58,7 @@ def connect_patches(coords: np.ndarray, dthresh: float) -> np.ndarray:
             pairs.update({(i, j), (j, i)})
     else:
         nbrs: dict[int, set[int]] = defaultdict(set)
-        for simplex in Delaunay(coords).simplices:
+        for simplex in delaunay_simplices(coords):
             for i in simplex:
                 nbrs[int(i)].update(int(j) for j in simplex if j != i)
         for i, js in nbrs.items():

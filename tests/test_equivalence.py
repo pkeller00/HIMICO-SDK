@@ -2,10 +2,12 @@
 import os
 from collections import defaultdict
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import torch
-from scipy.spatial import Delaunay, KDTree
+from scipy.spatial import KDTree
 
 from insight.stages.graph import connect_patches
 
@@ -22,10 +24,13 @@ def _example_graph():
 
 
 def _original_connect(C, dthresh):
-    """connectPatches from 5_extract_graphs/graphConstruction.py (SlideGraph+), dense W -> nonzero edges."""
-    tess = Delaunay(C)
+    """connectPatches from 5_extract_graphs/graphConstruction.py (SlideGraph+), dense W -> nonzero edges.
+    Uses the same triangulation as the SDK, so this checks the neighbour/distance logic; the triangulation itself is
+    checked against a real training graph in test_graph_edges_match_training_graph_exactly."""
+    from insight.stages.graph import delaunay_simplices
+
     nb = defaultdict(set)
-    for simplex in tess.simplices:
+    for simplex in delaunay_simplices(C):
         for idx in simplex:
             other = set(simplex)
             other.remove(idx)
@@ -64,3 +69,15 @@ def test_insight_crc_matches_reference():
     assert abs(-pred.folds[3] - 0.336644) < 1e-3
     assert abs(pred.risk - 0.23708) < 1e-4 and pred.group == "High"
     assert pred.local.shape == (g.x.shape[0],) and 0 <= pred.local.min() and pred.local.max() <= 1
+
+
+def test_graph_edges_match_training_graph_exactly():
+    """Public TCGA-4N-A93T DX1 slide: patch positions and the edges of the original INSIGHT graph. The vendored
+    Qhull 2019.1 (no fused multiply-add) must reproduce them edge for edge, in order."""
+    from insight.stages import graph
+
+    if graph._qhull_legacy is None:
+        pytest.skip("insight._qhull_legacy not built")
+    z = np.load(Path(__file__).parent / "data" / "tcga_4n_a93t_dx1_graph.npz")
+    e = connect_patches(z["coords"].astype(np.float64), 4000)
+    assert np.array_equal(e, z["edge_index"].astype(np.int64))

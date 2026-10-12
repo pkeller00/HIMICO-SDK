@@ -18,3 +18,6 @@ dist/
 *.mrxs
 insight_runs/
 weights/
+*.so
+*.pyd
+*.o
