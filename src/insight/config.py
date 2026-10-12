@@ -23,7 +23,7 @@ class TissueConfig:
     """Stage 2. CRC tissue-type classification; the selected types define where features are taken."""
 
     model: str = "crc-tissue-vit"
-    keep: list[str] = field(default_factory=lambda: ["TUM", "STR", "LYM", "MUC"])
+    keep: list[str] = field(default_factory=lambda: ["TUM", "STR", "LYM"])
     tile: int = 224
     mpp: float = 0.5
     mask_mpp: float = 8.0
@@ -127,7 +127,7 @@ mask:
   keep_classes: [1, 2, 5, 6]  # GrandQC: normal, fold, edge/air bubble, out-of-focus
 
 tissue:
-  keep: [TUM, STR, LYM, MUC]  # CRC tissue types used for features
+  keep: [TUM, STR, LYM]       # CRC tissue types used for features (tumour, stroma, lymphocytes)
   write_overlay: true
 
 features:

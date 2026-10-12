@@ -1,7 +1,7 @@
 """Stage 2: CRC tissue-type classification.
 
 A ViT-B/16 classifies 224 px tiles at 0.5 µm/px (inside the stage-1 mask, >40% coverage) into eight colorectal tissue
-types. Tiles whose most likely type is in `keep` (default TUM, STR, LYM, MUC) are painted into a tissue mask at
+types. Tiles whose most likely type is in `keep` (default TUM, STR, LYM: tumour, stroma, lymphocytes) are painted into a tissue mask at
 `mask_mpp`, which decides where stage-3 features are taken.
 """
 from __future__ import annotations

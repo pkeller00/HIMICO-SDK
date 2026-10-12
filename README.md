@@ -152,7 +152,7 @@ attach it to an issue or email.
   config.yaml  environment.json  cohort.csv  report.csv  logs/run_*.jsonl  status/<slide>.json
   masks/<slide>.png                    masks/qc/<slide>_classes.png, _overlay.jpg     (GrandQC classes 1-7)
   tissue/<slide>.npz                   tile bounds + 8-class probabilities (TUM NORM LYM MUS STR DEB MUC ADI)
-  tissue/<slide>_mask.png              tissue types used for features (default TUM, STR, LYM, MUC)
+  tissue/<slide>_mask.png              tissue types used for features (default TUM, STR, LYM)
   tissue/<slide>.db                    TIAToolbox overlay of tissue classes
   features/uni/<slide>.npz             patch bounds (0.5 µm/px) + 1024-d UNI embeddings
   graphs/slides/<slide>.pt             graphs/patients/<patient>.g   (PyTorch Geometric)
