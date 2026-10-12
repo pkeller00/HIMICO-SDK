@@ -94,6 +94,9 @@ pipe.mask(cohort); pipe.tissue(cohort); pipe.features(cohort); pipe.graphs(cohor
 pipe = Pipeline.from_workspace("insight_runs/tcga/run_1")
 ```
 
+In a script, put the calls under `if __name__ == "__main__":`. Tiles are read by worker processes, and on macOS and
+Windows those re-import your script (or use `workers=0`).
+
 ## Common tasks
 
 **Your own tissue masks.** Put `<slide_id>.png` (non-zero = usable tissue, covering the whole slide at any
@@ -156,6 +159,15 @@ attach it to an issue or email.
 Patient graphs keep the INSIGHT training format (`x`, `edge_index`, `coords`, `slideOrder`) and add `slide_ptr`
 (node range of each slide), so they also run with `inference.py` from the
 [GitHub repository](https://github.com/pkeller00/INSIGHT) and on the website's "Try INSIGHT" upload.
+
+## Reproducibility
+
+Run on the original INSIGHT patch positions of a public TCGA patient (TCGA-4N-A93T), the SDK reproduces the training
+pipeline: UNI features match with cosine similarity ≥ 0.99998, and with the original graph the patient risk is
+0.237039 vs 0.237084 and per-patch risk has Spearman 1.000 (differences are floating-point across hardware). One known
+difference remains: SciPy ≥ 1.13 triangulates the square patch grid with different (equally valid) diagonals from the
+SciPy used in training, which shifts results slightly (risk 0.23777 vs 0.23708; per-patch Spearman 0.997). Re-running
+the SDK on the same machine is deterministic.
 
 ## Adding a model
 

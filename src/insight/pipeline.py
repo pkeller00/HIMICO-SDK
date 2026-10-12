@@ -366,7 +366,8 @@ def _environment() -> dict:
     import importlib.metadata as md
     env = {"insight": __version__, "python": platform.python_version(), "platform": platform.platform(),
            "cuda": torch.version.cuda, "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}
-    for pkg in ("torch", "timm", "tiatoolbox", "torch_geometric", "segmentation-models-pytorch", "openslide-python"):
+    for pkg in ("torch", "timm", "tiatoolbox", "torch_geometric", "segmentation-models-pytorch", "openslide-python", "scipy",
+                "numpy"):
         try:
             env[pkg] = md.version(pkg)
         except md.PackageNotFoundError:

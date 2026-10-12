@@ -3,6 +3,12 @@
 Slide graph (as SlideGraph+ / the INSIGHT pipeline): nodes are patches, edges join Delaunay neighbours closer than
 `dthresh` pixels (top-left corners at the feature resolution).
 
+Reproducibility: patches lie on a square grid, where Delaunay triangulation is not unique (either diagonal of a square
+is valid). SciPy <= 1.12 (Qhull 2019, used to train INSIGHT) and SciPy >= 1.13 break these ties differently, so about 12%
+of edges, nearly all 45-degree diagonals, differ. Effect on the public TCGA example: risk 0.23708 vs 0.23777, per-patch
+Spearman 0.9965. SciPy <= 1.12 cannot be used with TIAToolbox 2 (it needs NumPy 2); the SciPy version is recorded in
+environment.json.
+
 Patient graph: the slide graphs of one patient are concatenated into one graph (no edges between slides), so the model
 sees the patient as a whole. As in the INSIGHT training pipeline, each later slide's coordinates are offset by the
 number of nodes before it; `slideOrder` names the slides and `slide_ptr` gives each slide's node range, so per-slide
