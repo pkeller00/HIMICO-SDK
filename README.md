@@ -189,21 +189,6 @@ attach it to an issue or email.
 Patient graphs keep the INSIGHT training format (`x`, `edge_index`, `coords`, `slideOrder`) and add `slide_ptr`
 (node range of each slide), so they also run on the INSIGHT website's "Try INSIGHT" upload.
 
-## Reproducibility
-
-Checked against the original INSIGHT pipeline on a public TCGA patient (TCGA-4N-A93T):
-
-* **Graphs:** identical edges, in the same order. Patches lie on a square grid, where Delaunay triangulation can pick
-  either diagonal of a square and the choice depends on floating-point rounding. INSIGHT's training graphs were built
-  with Qhull 2019.1 compiled without fused multiply-add, so the SDK ships its own copy of that Qhull
-  (`src/himico/_qhull`, Qhull licence) compiled with `-ffp-contract=off`, rather than relying on SciPy.
-* **Features:** UNI features at the original patch positions match with cosine similarity ≥ 0.99998.
-* **Predictions:** patient risk 0.237039 vs 0.237084 and per-patch Spearman 1.000 (remaining differences are
-  floating-point rounding across hardware).
-
-From raw slides, where masks are recomputed, IMMUcan IMU004 gives risk 0.475 vs 0.480 in the original run.
-Re-running the SDK on the same machine is deterministic.
-
 ## Adding a model
 
 Models are looked up by name, so a new model is one class:
