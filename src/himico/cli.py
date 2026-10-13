@@ -1,14 +1,16 @@
-"""`insight` command line.
+"""`himico` command line (also installed as `insight` for existing scripts).
 
-    insight init                      write a starter insight.yaml
-    insight run --slides /data/wsi --experiment tcga [--patient-regex RE] [--masks DIR] [--shard 0/4]
-    insight run --config insight.yaml --slides /data/wsi
-    insight report runs/tcga/run_1
-    insight models | insight weights [--download] | insight doctor
-    insight verify [--backend URL]     known-answer check before a big run
-    insight serve [--host 0.0.0.0]     host models for collaborators (INSIGHT_SERVER_TOKEN)
-    insight bundle WORKSPACE           privacy-safe support file
-    insight view WORKSPACE             browse slides with risk / tissue / QC overlays (TIAToolbox viewer)
+    himico login                     save your HIMICO API key (free academic / commercial)
+    himico account | himico logout
+    himico init                      write a starter himico.yaml
+    himico run --slides /data/wsi --experiment tcga [--patient-regex RE] [--masks DIR] [--shard 0/4]
+    himico run --config himico.yaml --slides /data/wsi
+    himico report runs/tcga/run_1
+    himico models | himico weights [--download] | himico doctor
+    himico verify [--backend URL]     known-answer check before a big run
+    himico serve [--keys keys.json]   host models yourself; `himico keys add NAME` issues API keys
+    himico bundle WORKSPACE           privacy-safe support file
+    himico view WORKSPACE             browse slides with risk / tissue / QC overlays (TIAToolbox viewer)
 """
 from __future__ import annotations
 
@@ -41,7 +43,7 @@ def cmd_init(a):
     if p.exists() and not a.force:
         sys.exit(f"{p} exists (use --force to overwrite)")
     p.write_text(template_yaml())
-    print(f"wrote {p}. Edit it, then: insight run --config {p} --slides /path/to/slides")
+    print(f"wrote {p}. Edit it, then: himico run --config {p} --slides /path/to/slides")
 
 
 def cmd_run(a):
@@ -97,11 +99,13 @@ def cmd_weights(a):
 
     rows = weights.status(a.weights_dir)
     for key, st in rows:
-        print(f"  {st:<8} {key}")
+        print(f"  {'server' if st == 'missing' and weights.private(key) else st:<8} {key}")
+    if any(st == "missing" and weights.private(k) for k, st in rows):
+        print("\n'server': private model weights; predictions run on the HIMICO server (`himico login`).")
     if a.download:
         print("\ndownloading missing files ...")
         for key, st in rows:
-            if st == "missing":
+            if st == "missing" and not weights.private(key):
                 try:
                     print("  ok      ", key, "->", weights.resolve(key, a.weights_dir))
                 except weights.WeightsUnavailable as e:
@@ -128,16 +132,27 @@ def cmd_doctor(a):
         from huggingface_hub import whoami
         print(f"hugging face: logged in as {whoami()['name']}")
     except Exception:
-        print("hugging face: not logged in (needed for gated INSIGHT and UNI weights: `hf auth login`)")
-    missing = [k for k, s in __import__("insight.weights", fromlist=["status"]).status(a.weights_dir) if s == "missing"]
-    print(f"weights: {'all available' if not missing else str(len(missing)) + ' not downloaded yet (see `insight weights`)'}")
+        print("hugging face: not logged in (needed for the gated UNI weights: `hf auth login`)")
+    from . import weights
+    missing = [k for k, s in weights.status(a.weights_dir) if s == "missing" and not weights.private(k)]
+    print(f"preprocessing weights: {'all available' if not missing else str(len(missing)) + ' not downloaded yet (see `himico weights`)'}")
+    from .auth import api_key, server_url
+    from .models.remote import RemoteError, account
+    if not api_key(server_url()):
+        print(f"HIMICO server {server_url()}: no API key (`himico login`)")
+    else:
+        try:
+            acct = account(server_url())
+            print(f"HIMICO server {server_url()}: {acct.get('name')} ({acct.get('tier')} tier)")
+        except RemoteError as e:
+            print(f"HIMICO server: {e}")
     sys.exit(0 if ok else 1)
 
 
 def cmd_verify(a):
     from .support import verify
 
-    res = verify(a.device or "auto", a.weights_dir, a.backend, a.quick)
+    res = verify(a.device or "auto", a.weights_dir, a.backend or "auto", a.quick, model=not a.preprocessing_only)
     for name, ok, detail in res:
         print(f"  {'PASS' if ok else 'FAIL'}  {name}: {detail}")
     bad = [r for r in res if not r[1]]
@@ -150,7 +165,61 @@ def cmd_serve(a):
     from .server import serve
 
     setup(None)
-    serve(a.host, a.port, a.device or "auto", a.weights_dir, preload=a.preload.split(",") if a.preload else None)
+    serve(a.host, a.port, a.device or "auto", a.weights_dir, preload=a.preload.split(",") if a.preload else None,
+          keys=a.keys)
+
+
+def cmd_login(a):
+    import getpass
+
+    from .auth import KEY_URL, save_key, server_url
+    from .models.remote import RemoteError, account
+
+    server = (a.server or server_url()).rstrip("/")
+    key = a.key or getpass.getpass(f"API key for {server} (request one at {KEY_URL}): ")
+    if not key.strip():
+        sys.exit("no key given")
+    path = save_key(key, server)
+    try:
+        acct = account(server)
+        print(f"logged in to {server} as {acct.get('name')} ({acct.get('tier')} tier); key saved to {path}")
+    except RemoteError as e:
+        print(f"key saved to {path}, but it could not be checked: {e}")
+
+
+def cmd_logout(a):
+    from .auth import forget_key, server_url
+
+    server = (a.server or server_url()).rstrip("/")
+    print(f"removed the saved key for {server}" if forget_key(server) else f"no saved key for {server}")
+
+
+def cmd_account(a):
+    from .auth import server_url
+    from .models.remote import account
+
+    server = (a.server or server_url()).rstrip("/")
+    acct = account(server)
+    print(f"server  {server}")
+    for k, v in acct.items():
+        print(f"{k:<7} {'all' if k == 'models' and v is None else v}")
+
+
+def cmd_keys(a):
+    from .server import add_key, load_keys, revoke_key
+
+    if a.action == "add":
+        if not a.name:
+            sys.exit("give a name: himico keys add NAME [--tier academic]")
+        key = add_key(a.file, a.name, a.tier, a.models.split(",") if a.models else None)
+        print(f"API key for {a.name} ({a.tier}); shown once, only its hash is stored in {a.file}:\n\n  {key}\n")
+    elif a.action == "list":
+        for r in load_keys(a.file).values():
+            print(f"  {r.get('id', '-'):<9} {r.get('tier', ''):<13} {r.get('name', '')}  models: {r.get('models') or 'all'}")
+    else:
+        if not a.name:
+            sys.exit("give the key id from `himico keys list`")
+        print("revoked; restart `himico serve` to apply" if revoke_key(a.file, a.name) else f"no key with id {a.name}")
 
 
 def cmd_bundle(a):
@@ -170,17 +239,30 @@ def cmd_view(a):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="insight", description="Run INSIGHT on whole-slide image cohorts.")
-    p.add_argument("--version", action="version", version=__import__("insight").__version__)
+    p = argparse.ArgumentParser(prog="himico", description="Run HIMICO models (INSIGHT, ...) on whole-slide image cohorts.")
+    p.add_argument("--version", action="version", version=__import__("himico").__version__)
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    s = sub.add_parser("login", help="save your HIMICO API key")
+    s.add_argument("--key", help="the key (default: prompt, so it stays out of your shell history)")
+    s.add_argument("--server", help="server URL (default: the hosted HIMICO server, or HIMICO_SERVER)")
+    s.set_defaults(fn=cmd_login)
+
+    s = sub.add_parser("logout", help="remove the saved API key")
+    s.add_argument("--server")
+    s.set_defaults(fn=cmd_logout)
+
+    s = sub.add_parser("account", help="show the name, tier and models of your API key")
+    s.add_argument("--server")
+    s.set_defaults(fn=cmd_account)
+
     s = sub.add_parser("init", help="write a starter config file")
-    s.add_argument("path", nargs="?", default="insight.yaml")
+    s.add_argument("path", nargs="?", default="himico.yaml")
     s.add_argument("--force", action="store_true")
     s.set_defaults(fn=cmd_init)
 
     s = sub.add_parser("run", help="run the pipeline over a cohort (resumable)")
-    s.add_argument("--config", help="YAML config (see `insight init`)")
+    s.add_argument("--config", help="YAML config (see `himico init`)")
     s.add_argument("--slides", help="folder of whole-slide images")
     s.add_argument("--csv", help="cohort CSV: slide_path or slide_id, optional patient_id")
     s.add_argument("--patient-regex", help=r"regex giving the patient id from the slide id, e.g. '^(TCGA-\w\w-\w{4})'")
@@ -196,7 +278,8 @@ def main(argv=None):
     s.add_argument("--workers", type=int)
     s.add_argument("--mpp", type=float, help="fallback microns-per-pixel for slides without it")
     s.add_argument("--weights-dir")
-    s.add_argument("--backend", help="run the model on an `insight serve` server, e.g. http://gpu-box:8080")
+    s.add_argument("--backend", help="where the model runs: auto (default: local weights if present, else the HIMICO "
+                                     "server), himico, local, or a `himico serve` URL")
     s.add_argument("--stages", help="comma list of mask,tissue,features,graphs,predict (default: all)")
     s.add_argument("--shard", help="i/n: process every n-th patient starting at i (for array jobs)")
     s.add_argument("--skip-failed", action="store_true", help="do not retry slides that failed before")
@@ -222,17 +305,27 @@ def main(argv=None):
     s = sub.add_parser("verify", help="known-answer check of models and weights before a big run")
     s.add_argument("--device")
     s.add_argument("--weights-dir")
-    s.add_argument("--backend", help="check an `insight serve` server instead of local weights")
+    s.add_argument("--backend", help="auto (default), himico, local, or a `himico serve` URL")
     s.add_argument("--quick", action="store_true", help="only the INSIGHT model check")
+    s.add_argument("--preprocessing-only", action="store_true", help="skip the model check (no API key needed)")
     s.set_defaults(fn=cmd_verify)
 
-    s = sub.add_parser("serve", help="host models behind a REST API (set INSIGHT_SERVER_TOKEN to require a token)")
+    s = sub.add_parser("serve", help="host models behind a REST API (API keys: --keys or HIMICO_SERVER_KEYS)")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8080)
     s.add_argument("--device")
     s.add_argument("--weights-dir")
     s.add_argument("--preload", help="comma list of models to load at start-up (default: on first request)")
+    s.add_argument("--keys", help="API keys file made with `himico keys add`")
     s.set_defaults(fn=cmd_serve)
+
+    s = sub.add_parser("keys", help="issue, list or revoke API keys for `himico serve`")
+    s.add_argument("action", choices=["add", "list", "revoke"])
+    s.add_argument("name", nargs="?", help="add: who the key is for; revoke: key id")
+    s.add_argument("--tier", default="academic", help="academic | commercial | collaborator | internal")
+    s.add_argument("--models", help="comma list of models the key may use (default: all)")
+    s.add_argument("--file", default="keys.json")
+    s.set_defaults(fn=cmd_keys)
 
     s = sub.add_parser("bundle", help="privacy-safe support file (config, environment, logs; IDs pseudonymised)")
     s.add_argument("workspace")
@@ -247,12 +340,13 @@ def main(argv=None):
     s.set_defaults(fn=cmd_view)
 
     a = p.parse_args(argv)
+    from .models.remote import RemoteError
     from .pipeline import ConfigMismatch
     from .weights import WeightsUnavailable
     try:
         a.fn(a)
-    except (ConfigMismatch, WeightsUnavailable, FileNotFoundError, ValueError) as e:
-        sys.exit(f"insight: {e}")
+    except (ConfigMismatch, WeightsUnavailable, RemoteError, FileNotFoundError, ValueError) as e:
+        sys.exit(f"himico: {e}")
     except KeyboardInterrupt:
         sys.exit("interrupted; re-run the same command to resume")
 

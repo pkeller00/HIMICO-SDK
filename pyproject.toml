@@ -3,14 +3,14 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "insight-crc"
-version = "0.1.0"
-description = "Run INSIGHT spatially resolved survival models on whole-slide image cohorts"
+name = "himico-sdk"
+version = "0.2.0"
+description = "HIMICO SDK: run HIMICO computational pathology models (INSIGHT, SPARROW, ...) on whole-slide image cohorts"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "CC BY-NC-ND 4.0" }
 authors = [{ name = "Piotr Keller", email = "Piotr.Keller@warwick.ac.uk" }]
-keywords = ["computational pathology", "whole slide images", "survival", "graph neural networks", "colorectal cancer"]
+keywords = ["computational pathology", "whole slide images", "survival", "graph neural networks", "colorectal cancer", "HIMICO"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Intended Audience :: Science/Research",
@@ -39,20 +39,20 @@ dev = ["pytest>=8", "tifffile>=2024.1"]
 viewer = ["bokeh>=3.3", "flask>=3", "flask-cors>=4"]
 
 [project.scripts]
-insight = "insight.cli:main"
+himico = "himico.cli:main"
+insight = "himico.cli:main"      # alias kept for scripts written for the INSIGHT SDK
 
-[project.entry-points."insight.models"]
-insight-crc = "insight.models.insight_crc:InsightCRC"
+[project.entry-points."himico.models"]
+insight-crc = "himico.models.insight_crc:InsightCRC"
 
 [project.urls]
-Homepage = "https://github.com/pkeller00/INSIGHT-SDK"
-Model = "https://github.com/pkeller00/INSIGHT"
-Paper = "https://arxiv.org/abs/2512.22262"
-Weights = "https://huggingface.co/pkeller01/INSIGHT"
+Homepage = "https://github.com/pkeller00/HIMICO-SDK"
+INSIGHT = "https://github.com/pkeller00/INSIGHT"
+"INSIGHT paper" = "https://arxiv.org/abs/2512.22262"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
 # Qhull licence terms require COPYING.txt to travel with every copy
-"insight._qhull" = ["COPYING.txt", "README.md", "README.scipy"]
+"himico._qhull" = ["COPYING.txt", "README.md", "README.scipy"]

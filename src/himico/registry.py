@@ -1,14 +1,14 @@
 """Registries so new feature extractors and prediction models plug in by name.
 
-    from insight.registry import register_model
-    from insight.models.base import Predictor
+    from himico.registry import register_model
+    from himico.models.base import Predictor
 
     @register_model("my-model")
     class MyModel(Predictor):
         features = "uni"
         ...
 
-Third-party packages can also expose models through the `insight.models` entry point group.
+Third-party packages can also expose models through the `himico.models` entry point group.
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def register_features(name: str) -> Callable[[T], T]:
 def _load_builtin():
     from . import models  # noqa: F401  (registers built-ins)
     from .stages import features  # noqa: F401
-    for ep in entry_points(group="insight.models"):
+    for ep in entry_points(group="himico.models"):
         if ep.name not in _MODELS:
             try:
                 _MODELS[ep.name] = ep.load()

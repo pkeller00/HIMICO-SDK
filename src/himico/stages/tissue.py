@@ -17,7 +17,7 @@ from PIL import Image
 from .. import weights
 from ..wsi import TileDataset, TileSpec, loader, mask_fraction, open_slide, size_at, tile_grid
 
-log = logging.getLogger("insight")
+log = logging.getLogger("himico")
 CLASSES = ["TUM", "NORM", "LYM", "MUS", "STR", "DEB", "MUC", "ADI"]
 
 

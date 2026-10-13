@@ -6,7 +6,7 @@ import logging
 import time
 from pathlib import Path
 
-LOGGER = logging.getLogger("insight")
+LOGGER = logging.getLogger("himico")
 
 
 class _Json(logging.Formatter):

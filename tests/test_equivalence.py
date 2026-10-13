@@ -9,14 +9,14 @@ import pytest
 import torch
 from scipy.spatial import KDTree
 
-from insight.stages.graph import connect_patches
+from himico.stages.graph import connect_patches
 
 WEIGHTS = os.environ.get("INSIGHT_WEIGHTS")          # optional local weights folder; otherwise Hugging Face
 
 
 def _example_graph():
     """Public TCGA example graph (downloaded once); skip the test if weights/access are unavailable."""
-    from insight import weights
+    from himico import weights
     try:
         return weights.resolve("verify/TCGA-4N-A93T.g", WEIGHTS)
     except Exception as e:  # pragma: no cover
@@ -27,7 +27,7 @@ def _original_connect(C, dthresh):
     """connectPatches from 5_extract_graphs/graphConstruction.py (SlideGraph+), dense W -> nonzero edges.
     Uses the same triangulation as the SDK, so this checks the neighbour/distance logic; the triangulation itself is
     checked against a real training graph in test_graph_edges_match_training_graph_exactly."""
-    from insight.stages.graph import delaunay_simplices
+    from himico.stages.graph import delaunay_simplices
 
     nb = defaultdict(set)
     for simplex in delaunay_simplices(C):
@@ -56,7 +56,7 @@ def test_graph_edges_match_original(seed):
 def test_insight_crc_matches_reference():
     from torch_geometric.data.data import Data, DataEdgeAttr, DataTensorAttr
     from torch_geometric.data.storage import GlobalStorage
-    from insight.models import InsightCRC
+    from himico.models import InsightCRC
 
     with torch.serialization.safe_globals([Data, DataEdgeAttr, DataTensorAttr, GlobalStorage]):
         g = torch.load(_example_graph(), weights_only=True)
@@ -74,10 +74,10 @@ def test_insight_crc_matches_reference():
 def test_graph_edges_match_training_graph_exactly():
     """Public TCGA-4N-A93T DX1 slide: patch positions and the edges of the original INSIGHT graph. The vendored
     Qhull 2019.1 (no fused multiply-add) must reproduce them edge for edge, in order."""
-    from insight.stages import graph
+    from himico.stages import graph
 
     if graph._qhull_legacy is None:
-        pytest.skip("insight._qhull_legacy not built")
+        pytest.skip("himico._qhull_legacy not built")
     z = np.load(Path(__file__).parent / "data" / "tcga_4n_a93t_dx1_graph.npz")
     e = connect_patches(z["coords"].astype(np.float64), 4000)
     assert np.array_equal(e, z["edge_index"].astype(np.int64))

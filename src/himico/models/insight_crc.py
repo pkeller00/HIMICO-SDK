@@ -98,6 +98,7 @@ class InsightCRC(Predictor):
     description = "Overall-survival risk for stage II/III colorectal cancer (4-fold ensemble)"
     paper = "https://arxiv.org/abs/2512.22262"
     folds = 4
+    weights = tuple(f"insight/fold{k}/{f}" for k in range(1, 5) for f in ("model.safetensors", "minmax.csv"))
 
     def __init__(self, device: torch.device, weights_dir: str | None = None):
         super().__init__(device, weights_dir)

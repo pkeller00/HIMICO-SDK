@@ -1,15 +1,16 @@
-# INSIGHT pipeline configuration. Every field is optional; these are the defaults.
-output: insight_runs          # workspace = <output>/<experiment>/run_<run>/<variant>
+# HIMICO pipeline configuration. Every field is optional; these are the defaults.
+output: himico_runs          # workspace = <output>/<experiment>/run_<run>/<variant>
 experiment: my_cohort
 run: 1
 description: ""
-model: insight-crc            # see `insight models`
+model: insight-crc            # see `himico models`
 device: auto                  # auto | cuda | cuda:1 | mps | cpu
 batch_size: 64
 workers: 4
 mpp: null                     # fallback microns-per-pixel if a slide does not record it
 weights_dir: null             # folder with local weights; otherwise downloaded from Hugging Face
-backend: null                 # e.g. http://gpu-server:8080 to run the model on an `insight serve` server
+backend: auto                 # auto: local model weights if you have them, else the HIMICO server (API key:
+                              #   `himico login`); himico | local | http://gpu-server:8080 (a `himico serve` server)
 
 mask:
   source: grandqc             # or a folder of <slide>.png masks you made yourself

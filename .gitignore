@@ -16,7 +16,9 @@ dist/
 *.tiff
 *.ndpi
 *.mrxs
+himico_runs/
 insight_runs/
+keys.json
 weights/
 *.so
 *.pyd

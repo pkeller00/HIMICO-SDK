@@ -1,4 +1,4 @@
-"""`insight view <workspace>`: open a finished run in the TIAToolbox slide viewer.
+"""`himico view <workspace>`: open a finished run in the TIAToolbox slide viewer.
 
 Builds <workspace>/viewer/ with
     slides/     links to the original slide files (nothing is copied)
@@ -36,7 +36,7 @@ def _link(src: Path, dst: Path):
 def prepare(workspace: str | Path) -> Path:
     ws = Path(workspace)
     if not (ws / "config.yaml").exists():
-        raise FileNotFoundError(f"{ws} is not an INSIGHT workspace (no config.yaml)")
+        raise FileNotFoundError(f"{ws} is not a HIMICO workspace (no config.yaml)")
     cfg = yaml.safe_load((ws / "config.yaml").read_text())
     model = cfg.get("model", "insight-crc")
     out = ws / "viewer"
@@ -81,7 +81,7 @@ def prepare(workspace: str | Path) -> Path:
                        "STR": [255, 127, 0], "DEB": [128, 128, 128], "MUC": [102, 194, 219], "ADI": [242, 217, 51]},
     }, indent=1))
     (out / "README.txt").write_text(
-        "Open with: insight view <workspace>  (or: tiatoolbox visualize --slides slides --overlays overlays)\n"
+        "Open with: himico view <workspace>  (or: tiatoolbox visualize --slides slides --overlays overlays)\n"
         "Overlays per slide:\n"
         "  *_insight_risk.db   INSIGHT local risk per patch; colour by 'risk' (0 = lower, 1 = higher risk)\n"
         "  *_tissue_types.db   CRC tissue type per tile; colour by 'max_class'\n"

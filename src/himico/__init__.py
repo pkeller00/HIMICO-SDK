@@ -1,11 +1,11 @@
-"""INSIGHT: spatially resolved survival models for whole-slide image cohorts.
+"""HIMICO SDK: run HIMICO computational pathology models (INSIGHT, SPARROW, ...) on whole-slide image cohorts.
 
-    from insight import Cohort, Pipeline
+    from himico import Cohort, Pipeline
 
     cohort = Cohort.from_folder("/data/wsi")
     preds = Pipeline(output="runs", experiment="my_cohort", run=1).run(cohort)
 """
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .cohort import Cohort, Slide  # noqa: E402
 from .config import PipelineConfig  # noqa: E402

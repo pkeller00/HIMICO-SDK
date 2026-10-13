@@ -2,9 +2,9 @@
 import numpy as np
 import pytest
 
-from insight.cohort import Cohort, slide_id
-from insight.config import PipelineConfig, template_yaml
-from insight.wsi import mask_fraction, tile_grid
+from himico.cohort import Cohort, slide_id
+from himico.config import PipelineConfig, template_yaml
+from himico.wsi import mask_fraction, tile_grid
 
 
 def test_slide_id_strips_extensions():
@@ -36,6 +36,39 @@ def test_config_roundtrip(tmp_path):
     p = tmp_path / "c.yaml"
     p.write_text(template_yaml())
     c = PipelineConfig.from_yaml(p)
-    assert c.workspace.as_posix() == "insight_runs/my_cohort/run_1" and c.mask.keep_classes == [1, 2, 5, 6]
+    assert c.workspace.as_posix() == "himico_runs/my_cohort/run_1" and c.mask.keep_classes == [1, 2, 5, 6]
     with pytest.raises(ValueError):
         PipelineConfig.from_dict({"not_a_key": 1})
+
+
+def test_api_key_storage_and_precedence(tmp_path, monkeypatch):
+    from himico import auth
+    monkeypatch.setenv("HIMICO_CONFIG_DIR", str(tmp_path))
+    monkeypatch.delenv("HIMICO_API_KEY", raising=False)
+    monkeypatch.delenv("INSIGHT_SERVER_TOKEN", raising=False)
+    assert auth.api_key("http://a") is None
+    p = auth.save_key("k1", "http://a/")
+    assert p.stat().st_mode & 0o077 == 0 and auth.api_key("http://a") == "k1" and auth.api_key("http://b") is None
+    monkeypatch.setenv("HIMICO_API_KEY", "env")
+    assert auth.api_key("http://a") == "env"
+    monkeypatch.delenv("HIMICO_API_KEY")
+    assert auth.forget_key("http://a") and auth.api_key("http://a") is None
+
+
+def test_backend_resolution(monkeypatch):
+    from himico.models.remote import resolve_backend
+    monkeypatch.setenv("HIMICO_SERVER", "https://example.org/")
+    assert resolve_backend("local") is None
+    assert resolve_backend("himico") == "https://example.org"
+    assert resolve_backend("http://gpu:8080/") == "http://gpu:8080"
+    with pytest.raises(ValueError):
+        resolve_backend("gpu-box")
+
+
+def test_server_keys_store_only_hashes(tmp_path):
+    from himico.server import _hash, add_key, load_keys, revoke_key
+    f = tmp_path / "keys.json"
+    key = add_key(f, "Jane", "academic", ["insight-crc"])
+    keys = load_keys(f)
+    assert key not in f.read_text() and keys[_hash(key)]["tier"] == "academic"
+    assert revoke_key(f, keys[_hash(key)]["id"]) and load_keys(f) == {}

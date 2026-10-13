@@ -1,6 +1,6 @@
-"""The INSIGHT pipeline: one object configures and runs every stage over a cohort.
+"""The HIMICO pipeline: one object configures and runs every stage over a cohort.
 
-    from insight import Cohort, Pipeline
+    from himico import Cohort, Pipeline
 
     cohort = Cohort.from_folder("/data/wsi", patient=r"^(TCGA-\\w\\w-\\w{4})")
     pipe = Pipeline(output="runs", experiment="tcga", run=1)
@@ -41,7 +41,7 @@ from .log import setup as setup_logging
 from .registry import get_features, get_model
 from .wsi import device_for
 
-log = logging.getLogger("insight")
+log = logging.getLogger("himico")
 STAGES = ("mask", "tissue", "features", "graphs", "predict")
 # config fields that change results; a workspace refuses a different value for these
 _RESULT_FIELDS = ("model", "mask", "tissue", "features", "graph", "mpp")
@@ -155,7 +155,7 @@ class Pipeline:
                           extra={"stage": stage, label: k, "status": "failed"})
                 log.debug(traceback.format_exc())
         if failures:
-            log.warning("%s: %d %s(s) failed; see `insight report` and logs/", stage, failures, label)
+            log.warning("%s: %d %s(s) failed; see `himico report` and logs/", stage, failures, label)
 
     def _ready(self, s: Slide, stage: str) -> bool:
         return self._status(s.id).get(stage, {}).get("status") == "done"
@@ -255,10 +255,11 @@ class Pipeline:
                     if self._status(f"patient__{_safe(p)}").get("patient_graph", {}).get("status") == "done"]
 
         def make():
-            if c.backend:
-                from .models.remote import RemotePredictor
-                log.info("predict: using model server %s", c.backend)
-                return RemotePredictor(c.backend, c.model, model_cls)
+            from .models.remote import RemotePredictor, resolve_backend
+            url = resolve_backend(c.backend, model_cls, c.weights_dir)
+            if url:
+                log.info("predict: sending patient graphs to %s (no images leave this machine)", url)
+                return RemotePredictor(url, c.model, model_cls)
             return model_cls(self.device, c.weights_dir)
 
         with _model(make) as model:
@@ -298,13 +299,24 @@ class Pipeline:
         if bad:
             raise ValueError(f"unknown stages {sorted(bad)}; choose from {STAGES}")
         self._prepare(cohort)
-        log.info("INSIGHT %s | %s | workspace %s | device %s", __version__, cohort.summary(), self.workspace, self.device)
+        if "predict" in stages:
+            self._check_backend()
+        log.info("HIMICO %s | %s | %s | workspace %s | device %s", __version__, self.config.model, cohort.summary(), self.workspace, self.device)
         for st in STAGES:
             if st in stages:
                 getattr(self, st)(cohort, retry_failed=retry_failed)
         self.report(cohort)
-        log.info("view the results on the slides with: insight view %s", self.workspace)
+        log.info("view the results on the slides with: himico view %s", self.workspace)
         return self.predictions()
+
+    def _check_backend(self):
+        """Warn before hours of preprocessing if the predict stage will have no API key."""
+        from .auth import api_key, missing_key_message
+        from .models.remote import resolve_backend
+        url = resolve_backend(self.config.backend, get_model(self.config.model), self.config.weights_dir)
+        if url and not api_key(url):
+            log.warning("predict stage: %s Preprocessing runs anyway; add the key and re-run to finish.",
+                        missing_key_message(url))
 
     def predictions(self) -> pd.DataFrame:
         """All patient predictions in the workspace (also written to predictions/<model>/predictions.csv)."""
@@ -364,7 +376,7 @@ def _safe(name: str) -> str:
 
 def _environment() -> dict:
     import importlib.metadata as md
-    env = {"insight": __version__, "python": platform.python_version(), "platform": platform.platform(),
+    env = {"himico": __version__, "python": platform.python_version(), "platform": platform.platform(),
            "cuda": torch.version.cuda, "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}
     for pkg in ("torch", "timm", "tiatoolbox", "torch_geometric", "segmentation-models-pytorch", "openslide-python", "scipy",
                 "numpy"):

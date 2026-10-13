@@ -12,7 +12,7 @@ from .. import weights
 from ..registry import register_features
 from ..wsi import TileDataset, TileSpec, loader, mask_fraction, open_slide, size_at, tile_grid
 
-log = logging.getLogger("insight")
+log = logging.getLogger("himico")
 
 
 class FeatureExtractor:

@@ -34,12 +34,15 @@ class Predictor:
       features   name of the registered feature extractor the model was trained on
       dthresh    graph edge distance used in training (None: use the config value)
       local_name label for the per-patch map (e.g. "INSIGHT risk")
+      weights    weight files (keys in himico.weights.FILES); if they are not on this machine, backend "auto" sends
+                 graphs to the HIMICO server instead
     """
 
     name = "base"
     features = "uni"
     dthresh: float | None = None
     local_name = "local value"
+    weights: tuple[str, ...] = ()
     description = ""
     paper = ""
 

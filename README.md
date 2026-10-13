@@ -1,49 +1,75 @@
-# insight-crc
+# HIMICO SDK
 
-Run **INSIGHT** ([paper](https://arxiv.org/abs/2512.22262)) on whole-slide image cohorts: from raw slides to
-patient-level survival risk, risk groups and patch-level risk maps, in one resumable command.
+One SDK for the HIMICO group's computational pathology models: from raw whole-slide images to patient-level
+predictions and patch-level maps, in one resumable command. Models available:
+
+| Model | Task | Paper |
+|---|---|---|
+| `insight-crc` | **INSIGHT**: overall-survival risk, risk groups and patch-level risk maps in stage II/III colorectal cancer | [arXiv:2512.22262](https://arxiv.org/abs/2512.22262) |
+| SPARROW, ... | coming soon | |
 
 ```
 slides ──► 1 mask ──► 2 tissue ──► 3 features ──► 4 graphs ──► 5 predict
-          GrandQC     CRC tissue     UNI          slide +       INSIGHT ensemble
-          (or yours)  types          embeddings   patient       + overlays/heatmaps
+          GrandQC     CRC tissue     UNI          slide +       model on the HIMICO server
+          (or yours)  types          embeddings   patient       (or local weights) + overlays/heatmaps
 ```
 
-Every stage runs over the whole cohort, caches its result per slide, and is skipped on the next run once done.
-Failed slides are recorded and retried; one bad slide never stops a cohort.
+Stages 1-4 always run on your own hardware. Every stage runs over the whole cohort, caches its result per slide, and
+is skipped on the next run once done. Failed slides are recorded and retried; one bad slide never stops a cohort.
 
 ## Install
 
 ```bash
-pip install insight-crc            # Python ≥ 3.10; a CUDA GPU is recommended for cohorts
-# or from source: pip install git+https://github.com/pkeller00/INSIGHT-SDK
-insight doctor                     # checks packages, GPU, Hugging Face login and weights
+pip install git+https://github.com/pkeller00/HIMICO-SDK    # Python ≥ 3.10; a CUDA GPU is recommended for cohorts
+himico doctor                     # checks packages, GPU, Hugging Face login, weights and your API key
 ```
 
 Reading `.svs`, `.ndpi` or `.mrxs` slides needs OpenSlide (`pip install openslide-bin` or your OS package).
+The `insight` command from earlier versions still works as an alias of `himico`.
 
 Hospitals and clusters can use the Docker image instead (GPU and CPU variants, optional offline build with weights):
 see [docker/README.md](docker/README.md).
 
-### Weights and access
+### API key
+
+Model weights (INSIGHT and future HIMICO models) are not distributed. Predictions run on the HIMICO server at the
+University of Warwick: for each patient the SDK sends only the UNI patch features and the graph edges (no images,
+no patch coordinates, no slide or patient IDs) and receives the prediction and patch-level map. Graphs are not
+stored or logged.
+
+1. Request a key: free for non-commercial academic research; commercial licences on request
+   (Piotr.Keller@warwick.ac.uk).
+2. Save it once:
+
+```bash
+himico login                     # prompts for the key; stored in ~/.config/himico/credentials.json (mode 600)
+himico account                   # name, tier and models of your key
+# clusters / containers: export HIMICO_API_KEY=... instead
+```
+
+`backend` decides where the model runs: `auto` (default) uses local weights if you were given them (in
+`--weights-dir`), otherwise the HIMICO server; `himico` always uses the server; `local` never does; a URL uses a
+self-hosted `himico serve`. The pipeline warns at the start of a run if no key is set, so preprocessing a cohort
+never ends in a surprise.
+
+### Preprocessing weights
 
 | Component | Source | Access |
 |---|---|---|
-| INSIGHT (4 folds) + CRC tissue classifier | [pkeller01/INSIGHT](https://huggingface.co/pkeller01/INSIGHT) | request access (academic, non-commercial) |
-| UNI feature extractor | [MahmoodLab/UNI](https://huggingface.co/MahmoodLab/UNI) | request access from its authors |
 | GrandQC tissue detection + artefact QC | [pkeller01/INSIGHT-preprocessing](https://huggingface.co/pkeller01/INSIGHT-preprocessing) | open (CC BY-NC-SA 4.0) |
+| CRC tissue classifier | [pkeller01/INSIGHT-preprocessing](https://huggingface.co/pkeller01/INSIGHT-preprocessing) | open (CC BY-NC-ND 4.0) |
+| UNI feature extractor | [MahmoodLab/UNI](https://huggingface.co/MahmoodLab/UNI) | request access from its authors, then `hf auth login` |
 
-Once approved, log in once with `hf auth login`; weights download on first use and are cached. On machines without
-internet, copy them into a folder and pass `--weights-dir` (layout: `insight weights --weights-dir DIR`).
-No access tokens are stored in this package.
+These download on first use and are cached. On machines without internet, copy them into a folder and pass
+`--weights-dir` (layout: `himico weights --weights-dir DIR`). No access tokens are stored in this package.
 
 ## Quick start
 
 ```bash
-insight run --slides /data/tcga_crc --experiment tcga --patient-regex '^(TCGA-\w\w-\w{4})'
+himico run --slides /data/tcga_crc --experiment tcga --patient-regex '^(TCGA-\w\w-\w{4})'
 ```
 
-Results land in `insight_runs/tcga/`:
+Results land in `himico_runs/tcga/`:
 
 ```
 predictions/insight-crc/predictions.csv     patient_id, score, risk, risk_group, fold scores, n_patches, n_slides
@@ -55,14 +81,14 @@ report.csv                                   per-slide status, usable tissue are
 Before a big run, check that everything is installed correctly:
 
 ```bash
-insight verify        # runs the example TCGA graph and checks the known answer (risk 0.237, High), then loads
-                      # GrandQC, the tissue classifier and UNI on a test tile
+himico verify         # sends the example TCGA graph to the server and checks the known answer (risk 0.237,
+                      # High), then loads GrandQC, the tissue classifier and UNI on a test tile
 ```
 
 ## Looking at the results
 
 ```bash
-insight view insight_runs/tcga            # opens the TIAToolbox slide viewer in your browser
+himico view himico_runs/tcga            # opens the TIAToolbox slide viewer in your browser
 ```
 
 Pick a slide on the left, then **Add Overlay**:
@@ -80,13 +106,13 @@ reads slides in place and runs only on your computer; closing the browser tab st
 ## Python API
 
 ```python
-from insight import Cohort, Pipeline
+from himico import Cohort, Pipeline
 
 cohort = Cohort.from_folder("/data/tcga_crc", patient=r"^(TCGA-\w\w-\w{4})")
 # or: Cohort.from_csv("cohort.csv", slide_dir="/data/tcga_crc")   # slide_id/slide_path, patient_id
 print(cohort.summary())
 
-pipe = Pipeline(output="insight_runs", experiment="tcga", run=1, device="cuda", batch_size=128, workers=8)
+pipe = Pipeline(output="himico_runs", experiment="tcga", run=1, device="cuda", batch_size=128, workers=8)
 preds = pipe.run(cohort)            # all stages; re-run to resume
 pipe.report()                       # per-slide status DataFrame
 
@@ -94,7 +120,7 @@ pipe.report()                       # per-slide status DataFrame
 pipe.mask(cohort); pipe.tissue(cohort); pipe.features(cohort); pipe.graphs(cohort); pipe.predict(cohort)
 
 # reopen a finished workspace with exactly the same settings
-pipe = Pipeline.from_workspace("insight_runs/tcga/run_1")
+pipe = Pipeline.from_workspace("himico_runs/tcga/run_1")
 ```
 
 In a script, put the calls under `if __name__ == "__main__":`. Tiles are read by worker processes, and on macOS and
@@ -113,35 +139,36 @@ writes into the same workspace. Pin a GPU with `--device cuda:1`.
 
 **Slides without resolution metadata.** Pass `--mpp 0.25` as a fallback.
 
-**One config file.** `insight init` writes `insight.yaml` with every option; run it with `insight run --config insight.yaml --slides DIR`.
+**One config file.** `himico init` writes `himico.yaml` with every option; run it with `himico run --config himico.yaml --slides DIR`.
 The resolved config is saved to the workspace; a workspace refuses to mix results from different settings, so use a
 new `--run` or `--variant` to compare settings side by side.
 
-## Hosting the model for collaborators
+## Hosting models yourself
 
-`insight serve` puts the models behind a small REST API on a machine that holds the weights. Collaborators run the
-heavy preprocessing (masks, tissue, UNI, graphs) on their own hardware and send only patient graphs, so the INSIGHT
-weights never leave your server:
+`himico serve` puts the models behind the same REST API as the hosted HIMICO server, on a machine that holds the
+weights (for groups that have been given them). Users run the heavy preprocessing (masks, tissue, UNI, graphs) on
+their own hardware and send only patient graphs, so the weights never leave the server:
 
 ```bash
 # on the GPU server
-export INSIGHT_SERVER_TOKEN=$(openssl rand -hex 24)        # share with collaborators
-insight serve --host 0.0.0.0 --port 8080 --preload insight-crc
+himico keys add "Jane Doe, Uni X" --tier academic --file keys.json   # prints the key once; only its hash is stored
+himico serve --host 0.0.0.0 --port 8080 --keys keys.json --weights-dir /secure/weights --preload insight-crc
 
-# on the collaborator's machine
-export INSIGHT_SERVER_TOKEN=...
-insight verify --backend http://gpu-server:8080
-insight run --slides /data/wsi --experiment cohort --backend http://gpu-server:8080
+# on the user's machine
+himico login --server http://gpu-server:8080
+himico verify --backend http://gpu-server:8080
+himico run --slides /data/wsi --experiment cohort --backend http://gpu-server:8080
 ```
 
-Endpoints: `GET /ping`, `GET /models`, `POST /predict/<model>` (body: `.g` bytes). Uploaded graphs are opened with a
-restricted loader that cannot run code, validated, and never stored or logged. Without a token the server binds to
-localhost only unless you choose otherwise; behind a public address always set a token (and ideally HTTPS via a
-reverse proxy).
+Endpoints: `GET /ping` (no key), `GET /account`, `GET /models`, `POST /predict/<model>` (body: `.g` bytes), with
+`Authorization: Bearer <key>`. Keys carry a tier and optionally a list of allowed models (`--models`); `himico keys
+list` and `himico keys revoke ID` manage them. Uploaded graphs are opened with a restricted loader that cannot run
+code, validated, and never stored or logged. Without keys the server binds to localhost only unless you choose
+otherwise; behind a public address always use keys (and HTTPS via a reverse proxy).
 
 ## Getting help
 
-`insight bundle <workspace>` packs the config, environment, report, status files and logs into a `.tar.gz` with slide
+`himico bundle <workspace>` packs the config, environment, report, status files and logs into a `.tar.gz` with slide
 IDs, patient IDs and file paths replaced by pseudonyms (no images, features or predictions). Look through it, then
 attach it to an issue or email.
 
@@ -160,8 +187,7 @@ attach it to an issue or email.
 ```
 
 Patient graphs keep the INSIGHT training format (`x`, `edge_index`, `coords`, `slideOrder`) and add `slide_ptr`
-(node range of each slide), so they also run with `inference.py` from the
-[GitHub repository](https://github.com/pkeller00/INSIGHT) and on the website's "Try INSIGHT" upload.
+(node range of each slide), so they also run on the INSIGHT website's "Try INSIGHT" upload.
 
 ## Reproducibility
 
@@ -170,7 +196,7 @@ Checked against the original INSIGHT pipeline on a public TCGA patient (TCGA-4N-
 * **Graphs:** identical edges, in the same order. Patches lie on a square grid, where Delaunay triangulation can pick
   either diagonal of a square and the choice depends on floating-point rounding. INSIGHT's training graphs were built
   with Qhull 2019.1 compiled without fused multiply-add, so the SDK ships its own copy of that Qhull
-  (`src/insight/_qhull`, Qhull licence) compiled with `-ffp-contract=off`, rather than relying on SciPy.
+  (`src/himico/_qhull`, Qhull licence) compiled with `-ffp-contract=off`, rather than relying on SciPy.
 * **Features:** UNI features at the original patch positions match with cosine similarity ≥ 0.99998.
 * **Predictions:** patient risk 0.237039 vs 0.237084 and per-patch Spearman 1.000 (remaining differences are
   floating-point rounding across hardware).
@@ -183,8 +209,8 @@ Re-running the SDK on the same machine is deterministic.
 Models are looked up by name, so a new model is one class:
 
 ```python
-from insight import register_model
-from insight.models import Predictor, Prediction
+from himico import register_model
+from himico.models import Predictor, Prediction
 
 @register_model("my-model")
 class MyModel(Predictor):
@@ -194,18 +220,20 @@ class MyModel(Predictor):
 
     def __init__(self, device, weights_dir=None):
         super().__init__(device, weights_dir)
-        ...                    # load weights (see insight.weights.resolve)
+        ...                    # load weights (see himico.weights.resolve)
 
     def predict(self, graph) -> Prediction:
         ...                    # return Prediction(patient, score, risk, group, folds, local)
 ```
 
-Then `Pipeline(model="my-model")` or `insight run --model my-model`. Packages can also expose models through the
-`insight.models` entry point. New feature extractors register with `@register_features("name")`.
+Then `Pipeline(model="my-model")` or `himico run --model my-model`. Packages can also expose models through the
+`himico.models` entry point. New feature extractors register with `@register_features("name")`.
 
 ## Citation and licence
 
-The SDK and INSIGHT weights are released under [CC BY-NC-ND 4.0](LICENSE): academic, non-commercial research use only; not a medical device. Please cite:
+The SDK is released under [CC BY-NC-ND 4.0](LICENSE): academic, non-commercial research use only; not a medical
+device. Commercial use of the SDK or the hosted models needs a licence (Piotr.Keller@warwick.ac.uk). If you use
+INSIGHT, please cite:
 
 ```bibtex
 @article{keller2025insight,

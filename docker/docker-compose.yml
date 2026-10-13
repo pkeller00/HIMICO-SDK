@@ -1,23 +1,23 @@
-# Host INSIGHT for collaborators with `insight serve` (GPU). Collaborators run the pipeline on their own data and use
-#   insight run ... --backend http://<this-host>:8080        (with INSIGHT_SERVER_TOKEN set to the same token)
+# Host HIMICO models with `himico serve` (GPU), for groups that hold the model weights. Users run the pipeline on
+# their own data and use
+#   himico login --server http://<this-host>:8080 && himico run ... --backend http://<this-host>:8080
 #
-#   export INSIGHT_SERVER_TOKEN=$(openssl rand -hex 24)
-#   export HF_TOKEN=...            # your approved Hugging Face token (first start downloads the weights)
+#   himico keys add "Jane Doe, Uni X" --tier academic --file server/keys.json   # issue keys (only hashes stored)
+#   export HIMICO_WEIGHTS=/secure/weights                                       # insight/fold{1..4}/...
 #   docker compose -f docker/docker-compose.yml up -d
 services:
-  insight-server:
+  himico-server:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: insight:gpu
-    command: ["serve", "--host", "0.0.0.0", "--port", "8080", "--preload", "insight-crc"]
+    image: himico:gpu
+    command: ["serve", "--host", "0.0.0.0", "--port", "8080", "--keys", "/srv/keys.json",
+              "--weights-dir", "/weights", "--preload", "insight-crc"]
     ports:
       - "8080:8080"           # put a TLS reverse proxy in front if this is reachable beyond your network
-    environment:
-      - INSIGHT_SERVER_TOKEN
-      - HF_TOKEN
     volumes:
-      - insight-cache:/cache
+      - ../server:/srv:ro
+      - ${HIMICO_WEIGHTS:?set HIMICO_WEIGHTS to the folder with the model weights}:/weights:ro
     restart: unless-stopped
     deploy:
       resources:
@@ -26,6 +26,3 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-
-volumes:
-  insight-cache:

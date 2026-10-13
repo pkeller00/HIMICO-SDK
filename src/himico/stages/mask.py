@@ -23,7 +23,7 @@ from PIL import Image
 from .. import weights
 from ..wsi import open_slide, slide_mpp
 
-log = logging.getLogger("insight")
+log = logging.getLogger("himico")
 Image.MAX_IMAGE_PIXELS = None
 
 TD_MPP = 10.0

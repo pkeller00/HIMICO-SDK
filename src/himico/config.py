@@ -50,7 +50,7 @@ class GraphConfig:
 
 @dataclass
 class PipelineConfig:
-    output: str = "insight_runs"
+    output: str = "himico_runs"
     experiment: str | None = None
     run: int | None = None
     variant: str | None = None
@@ -61,7 +61,7 @@ class PipelineConfig:
     workers: int = 4
     mpp: float | None = None           # fallback microns-per-pixel for slides that lack it
     weights_dir: str | None = None     # local folder with weights (otherwise Hugging Face)
-    backend: str | None = None         # URL of an `insight serve` server to run the model on (token: INSIGHT_SERVER_TOKEN)
+    backend: str | None = "auto"       # where the model runs: auto | himico | local | URL of a `himico serve` server
     mask: MaskConfig = field(default_factory=MaskConfig)
     tissue: TissueConfig = field(default_factory=TissueConfig)
     features: FeatureConfig = field(default_factory=FeatureConfig)
@@ -106,20 +106,21 @@ class PipelineConfig:
 
 
 def template_yaml() -> str:
-    """A commented starter config for `insight init`."""
+    """A commented starter config for `himico init`."""
     return """\
-# INSIGHT pipeline configuration. Every field is optional; these are the defaults.
-output: insight_runs          # workspace = <output>/<experiment>/run_<run>/<variant>
+# HIMICO pipeline configuration. Every field is optional; these are the defaults.
+output: himico_runs          # workspace = <output>/<experiment>/run_<run>/<variant>
 experiment: my_cohort
 run: 1
 description: ""
-model: insight-crc            # see `insight models`
+model: insight-crc            # see `himico models`
 device: auto                  # auto | cuda | cuda:1 | mps | cpu
 batch_size: 64
 workers: 4
 mpp: null                     # fallback microns-per-pixel if a slide does not record it
 weights_dir: null             # folder with local weights; otherwise downloaded from Hugging Face
-backend: null                 # e.g. http://gpu-server:8080 to run the model on an `insight serve` server
+backend: auto                 # auto: local model weights if you have them, else the HIMICO server (API key:
+                              #   `himico login`); himico | local | http://gpu-server:8080 (a `himico serve` server)
 
 mask:
   source: grandqc             # or a folder of <slide>.png masks you made yourself

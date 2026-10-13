@@ -1,7 +1,9 @@
 """Model weights: a local folder first, otherwise Hugging Face (with the user's own login for gated repos).
 
-No access tokens live in this package. Gated weights (INSIGHT, UNI) need an approved request on Hugging Face and
-`hf auth login` (or HF_TOKEN) on the machine that runs the pipeline.
+Preprocessing weights (GrandQC, CRC tissue classifier) are public. UNI is gated by its authors: request access and run
+`hf auth login` (or set HF_TOKEN). Prediction-model weights (INSIGHT, ...) are private and not downloaded: the
+pipeline sends patient graphs to the HIMICO server (see himico.auth) unless you were given the weights and put them
+in a local `weights_dir`. No access tokens live in this package.
 """
 from __future__ import annotations
 
@@ -10,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-log = logging.getLogger("insight")
+log = logging.getLogger("himico")
 
 PREPROCESSING_REPO = "pkeller01/INSIGHT-preprocessing"
 INSIGHT_REPO = "pkeller01/INSIGHT"
@@ -36,16 +38,16 @@ FILES: dict[str, WeightFile] = {f.key: f for f in [
                "28c3d10b1e530809cc4ea76b66d5b35bc3552e250513423aad2a04528a670c0e", _GRANDQC),
     WeightFile("grandqc/qc_mpp2.safetensors", PREPROCESSING_REPO, "grandqc/qc_mpp2.safetensors",
                "b0fac1fdb6aa49dade415e41a6a6beaa19005b6dfac31517a34428f515cdc521", _GRANDQC),
-    WeightFile("crc_tissue/vit_b16.safetensors", INSIGHT_REPO, "crc_tissue/vit_b16.safetensors",
+    WeightFile("crc_tissue/vit_b16.safetensors", PREPROCESSING_REPO, "crc_tissue/vit_b16.safetensors",
                "c13051b569e40ac9e83628630cc001998c0e5004b74052cdf7640bde378b42c6",
-               "The INSIGHT CRC tissue classifier is gated with the INSIGHT weights: request access at "
-               "https://huggingface.co/pkeller01/INSIGHT"),
+               "INSIGHT CRC tissue classifier, CC BY-NC-ND 4.0"),
     WeightFile("verify/TCGA-4N-A93T.g", PREPROCESSING_REPO, "verify/TCGA-4N-A93T.g",
-               "445b375470535d38f83116a74f6ca2db17fad79e8e351c5294a122c71418d951", "public TCGA example graph for `insight verify`"),
+               "445b375470535d38f83116a74f6ca2db17fad79e8e351c5294a122c71418d951", "public TCGA example graph for `himico verify`"),
     WeightFile("uni/pytorch_model.bin", UNI_REPO, "pytorch_model.bin", None,
                "UNI is gated by its authors: request access at https://huggingface.co/MahmoodLab/UNI"),
     *[WeightFile(f"insight/fold{k}/{name}", INSIGHT_REPO, f"fold{k}/{name}", sha,
-                 "INSIGHT weights are gated: request access at https://huggingface.co/pkeller01/INSIGHT")
+                 "INSIGHT weights are private: predictions run on the HIMICO server (`himico login`), or put weights "
+                 "you were given in --weights-dir")
       for k, sha in zip(range(1, 5), ["faed11049dfdc0927ea70749004d4b78bce83cce7832da463e7f178c09bdfbf8",
                                       "ce4e40bf3538c3fa79c6ac54e4a335b93e1440dd9afd52110968eb4c68564125",
                                       "e10c43e3aa5a2334c51130fa5385a3fb87a8adc47fdb66eb06650665e3855bc9",
@@ -56,6 +58,11 @@ FILES: dict[str, WeightFile] = {f.key: f for f in [
 
 class WeightsUnavailable(RuntimeError):
     pass
+
+
+def private(key: str) -> bool:
+    """Weights that are never downloaded for users (only the HIMICO server and named collaborators hold them)."""
+    return FILES[key].repo == INSIGHT_REPO
 
 
 def _sha256(path: Path) -> str:
@@ -81,7 +88,7 @@ def resolve(key: str, weights_dir: str | Path | None = None, verify: bool = True
     try:
         path = Path(hf_hub_download(spec.repo, spec.repo_path))
     except GatedRepoError as e:
-        raise WeightsUnavailable(f"{key}: access not granted yet. {spec.note}. Then run `hf auth login`.") from e
+        raise WeightsUnavailable(f"{key}: access not granted. {spec.note}" + ("" if private(key) else ". Then run `hf auth login`.")) from e
     except RepositoryNotFoundError as e:
         raise WeightsUnavailable(
             f"{key}: repository {spec.repo} not found or not accessible. {spec.note}. "
@@ -89,6 +96,13 @@ def resolve(key: str, weights_dir: str | Path | None = None, verify: bool = True
     if verify and spec.sha256 and _sha256(path) != spec.sha256:
         raise WeightsUnavailable(f"{key}: checksum mismatch for {path}")
     return path
+
+
+def available(keys, weights_dir: str | Path | None = None) -> bool:
+    """True if every file is in `weights_dir` or the Hugging Face cache (no network access)."""
+    from huggingface_hub import try_to_load_from_cache
+    return all((weights_dir and (Path(weights_dir) / k).exists())
+               or isinstance(try_to_load_from_cache(FILES[k].repo, FILES[k].repo_path), str) for k in keys)
 
 
 def status(weights_dir: str | Path | None = None) -> list[tuple[str, str]]:

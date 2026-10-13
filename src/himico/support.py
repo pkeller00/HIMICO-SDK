@@ -1,4 +1,4 @@
-"""`insight verify` (known-answer checks before an expensive run) and `insight bundle` (privacy-safe support file)."""
+"""`himico verify` (known-answer checks before an expensive run) and `himico bundle` (privacy-safe support file)."""
 from __future__ import annotations
 
 import hashlib
@@ -19,14 +19,18 @@ REFERENCE = {"model": "insight-crc", "risk": 0.23708, "group": "High", "fold4_ri
 TOLERANCE = 2e-3          # devices (CPU / CUDA / MPS) differ slightly in floating point
 
 
-def verify(device: str = "auto", weights_dir: str | None = None, backend: str | None = None, quick: bool = False):
-    """Returns a list of (check, ok, detail). Model check uses a known answer; preprocessing networks are loaded and
-    run on a synthetic tile (shapes, finite values, determinism)."""
+def verify(device: str = "auto", weights_dir: str | None = None, backend: str | None = "auto", quick: bool = False,
+           model: bool = True):
+    """Returns a list of (check, ok, detail). Model check uses a known answer (locally or on the server, as chosen by
+    `backend`); preprocessing networks always run locally on a synthetic tile (shapes, finite values, determinism)."""
     from . import weights
+    from .models.remote import resolve_backend
+    from .registry import get_model
     from .safe_graph import load_graph
     from .wsi import device_for
 
     dev = device_for(device)
+    backend = resolve_backend(backend, get_model(REFERENCE["model"]), weights_dir) if model else None
     results = []
 
     def check(name, fn):
@@ -41,10 +45,8 @@ def verify(device: str = "auto", weights_dir: str | None = None, backend: str | 
         g = load_graph(Path(weights.resolve("verify/TCGA-4N-A93T.g", weights_dir)).read_bytes())
         if backend:
             from .models.remote import RemotePredictor
-            from .registry import get_model
             m = RemotePredictor(backend, REFERENCE["model"], get_model(REFERENCE["model"]))
         else:
-            from .registry import get_model
             m = get_model(REFERENCE["model"])(dev, weights_dir)
         p = m.predict(g)
         if abs(p.risk - REFERENCE["risk"]) > TOLERANCE or p.group != REFERENCE["group"]:
@@ -53,8 +55,9 @@ def verify(device: str = "auto", weights_dir: str | None = None, backend: str | 
             raise AssertionError(f"fold 4 risk {-p.folds[3]:.5f}; expected {REFERENCE['fold4_risk']}")
         return f"risk {p.risk:.5f} {p.group}, matches reference {REFERENCE['risk']}" + (f" via {backend}" if backend else "")
 
-    check(f"INSIGHT model on example TCGA graph ({'server' if backend else dev})", model_check)
-    if quick or backend:
+    if model:
+        check(f"INSIGHT model on example TCGA graph ({'server' if backend else dev})", model_check)
+    if quick:
         return results
 
     rng = np.random.default_rng(0)
@@ -100,7 +103,7 @@ def bundle(workspace: str | Path, out: str | Path | None = None) -> Path:
 
     ws = Path(workspace)
     if not (ws / "config.yaml").exists():
-        raise FileNotFoundError(f"{ws} is not an INSIGHT workspace")
+        raise FileNotFoundError(f"{ws} is not a HIMICO workspace")
     salt = secrets.token_hex(8)
     tokens: dict[str, str] = {}
 
@@ -125,19 +128,19 @@ def bundle(workspace: str | Path, out: str | Path | None = None) -> Path:
 
     files = [ws / "config.yaml", ws / "environment.json", ws / "report.csv", ws / "cohort.csv"]
     files += sorted((ws / "logs").glob("*.jsonl")) + sorted((ws / "status").glob("*.json"))
-    out = Path(out) if out else ws / f"insight_support_{time.strftime('%Y%m%d-%H%M%S')}.tar.gz"
+    out = Path(out) if out else ws / f"himico_support_{time.strftime('%Y%m%d-%H%M%S')}.tar.gz"
     with tarfile.open(out, "w:gz") as tar:
         for f in files:
             if not f.exists():
                 continue
             data = scrub(f.read_text(errors="replace")).encode()
             name = scrub(str(f.relative_to(ws)))
-            info = tarfile.TarInfo(f"insight_support/{name}")
+            info = tarfile.TarInfo(f"himico_support/{name}")
             info.size, info.mtime = len(data), int(time.time())
             tar.addfile(info, io.BytesIO(data))
-        readme = ("INSIGHT support bundle. Slide IDs, patient IDs and file paths were replaced by pseudonyms "
+        readme = ("HIMICO support bundle. Slide IDs, patient IDs and file paths were replaced by pseudonyms "
                   "(consistent within this bundle only). No images, features or predictions are included.\n").encode()
-        info = tarfile.TarInfo("insight_support/README.txt")
+        info = tarfile.TarInfo("himico_support/README.txt")
         info.size, info.mtime = len(readme), int(time.time())
         tar.addfile(info, io.BytesIO(readme))
     return out
