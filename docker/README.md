@@ -49,20 +49,6 @@ The build runs `himico verify` so a broken image never leaves the build machine.
 secret and is not stored in the image. Run offline images with `-e HF_HUB_OFFLINE=1` and without the `/cache` volume.
 **UNI weights may not be redistributed: keep images built with `BAKE_WEIGHTS=1` inside your organisation.**
 
-## Host the models yourself
-
-`docker-compose.yml` runs `himico serve` on a GPU with an API keys file and the model weights you hold:
-
-```bash
-docker run --rm -v "$PWD/server":/srv himico:cpu keys add "Jane Doe, Uni X" --tier academic --file /srv/keys.json
-export HIMICO_WEIGHTS=/secure/weights      # contains insight/fold{1..4}/{model.safetensors, minmax.csv}
-docker compose -f docker/docker-compose.yml up -d
-```
-
-Users then run the pipeline on their own data with `--backend http://<host>:8080` after
-`himico login --server http://<host>:8080`; only patch features and graph edges are sent. Put a TLS reverse proxy in front if the port is reachable beyond
-your network.
-
 ## Viewing results
 
 The TIAToolbox viewer loads its image tiles from `127.0.0.1`, so inside a container it needs host networking and a

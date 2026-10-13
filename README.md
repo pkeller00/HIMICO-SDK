@@ -48,9 +48,8 @@ himico account                   # name, tier and models of your key
 ```
 
 `backend` decides where the model runs: `auto` (default) uses local weights if you were given them (in
-`--weights-dir`), otherwise the HIMICO server; `himico` always uses the server; `local` never does; a URL uses a
-self-hosted `himico serve`. The pipeline warns at the start of a run if no key is set, so preprocessing a cohort
-never ends in a surprise.
+`--weights-dir`), otherwise the HIMICO server; `himico` always uses the server; `local` never does. The pipeline
+warns at the start of a run if no key is set, so preprocessing a cohort never ends in a surprise.
 
 ### Preprocessing weights
 
@@ -142,29 +141,6 @@ writes into the same workspace. Pin a GPU with `--device cuda:1`.
 **One config file.** `himico init` writes `himico.yaml` with every option; run it with `himico run --config himico.yaml --slides DIR`.
 The resolved config is saved to the workspace; a workspace refuses to mix results from different settings, so use a
 new `--run` or `--variant` to compare settings side by side.
-
-## Hosting models yourself
-
-`himico serve` puts the models behind the same REST API as the hosted HIMICO server, on a machine that holds the
-weights (for groups that have been given them). Users run the heavy preprocessing (masks, tissue, UNI, graphs) on
-their own hardware and send only patient graphs, so the weights never leave the server:
-
-```bash
-# on the GPU server
-himico keys add "Jane Doe, Uni X" --tier academic --file keys.json   # prints the key once; only its hash is stored
-himico serve --host 0.0.0.0 --port 8080 --keys keys.json --weights-dir /secure/weights --preload insight-crc
-
-# on the user's machine
-himico login --server http://gpu-server:8080
-himico verify --backend http://gpu-server:8080
-himico run --slides /data/wsi --experiment cohort --backend http://gpu-server:8080
-```
-
-Endpoints: `GET /ping` (no key), `GET /account`, `GET /models`, `POST /predict/<model>` (body: `.g` bytes), with
-`Authorization: Bearer <key>`. Keys carry a tier and optionally a list of allowed models (`--models`); `himico keys
-list` and `himico keys revoke ID` manage them. Uploaded graphs are opened with a restricted loader that cannot run
-code, validated, and never stored or logged. Without keys the server binds to localhost only unless you choose
-otherwise; behind a public address always use keys (and HTTPS via a reverse proxy).
 
 ## Getting help
 
