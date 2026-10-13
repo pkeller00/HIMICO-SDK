@@ -11,7 +11,7 @@
 set -euo pipefail
 # API key for the predict stage: `himico login` once on a login node, or export HIMICO_API_KEY=...
 N=${SLURM_ARRAY_TASK_COUNT:-8}
-himico run \
+himico run --model insight-crc \
   --slides /path/to/slides \
   --patient-regex '^(TCGA-\w\w-\w{4})' \
   --output /path/to/himico_runs --experiment my_cohort --run 1 \
@@ -19,4 +19,4 @@ himico run \
   --shard "${SLURM_ARRAY_TASK_ID}/${N}"
 
 # After all tasks finish, collect the report and predictions once (fast; everything is cached):
-#   himico run --slides /path/to/slides --output /path/to/himico_runs --experiment my_cohort --run 1 --stages predict
+#   himico run --model insight-crc --slides /path/to/slides --output /path/to/himico_runs --experiment my_cohort --run 1 --stages predict

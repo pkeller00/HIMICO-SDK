@@ -20,7 +20,7 @@ TOLERANCE = 2e-3          # devices (CPU / CUDA / MPS) differ slightly in floati
 
 
 def verify(device: str = "auto", weights_dir: str | None = None, backend: str | None = "auto", quick: bool = False,
-           model: bool = True):
+           model: bool = True, name: str = "insight-crc"):
     """Returns a list of (check, ok, detail). Model check uses a known answer (locally or on the server, as chosen by
     `backend`); preprocessing networks always run locally on a synthetic tile (shapes, finite values, determinism)."""
     from . import weights
@@ -30,6 +30,8 @@ def verify(device: str = "auto", weights_dir: str | None = None, backend: str | 
     from .wsi import device_for
 
     dev = device_for(device)
+    if get_model(name).task == "virtual-stain":
+        return _verify_virtual_stain(name, dev, weights_dir)
     backend = resolve_backend(backend, get_model(REFERENCE["model"]), weights_dir) if model else None
     results = []
 
@@ -89,6 +91,24 @@ def verify(device: str = "auto", weights_dir: str | None = None, backend: str | 
     check("CRC tissue classifier", tissue)
     check("UNI feature extractor", features)
     return results
+
+
+def _verify_virtual_stain(name, dev, weights_dir):
+    """Weights download and checksum, then one synthetic tile: output shape, range, finiteness and determinism."""
+    from .registry import get_model
+
+    t = time.perf_counter()
+    try:
+        m = get_model(name)(dev, weights_dir)
+        tile = torch.from_numpy((np.random.default_rng(0).random((1, 256, 256, 3)) * 255).astype(np.uint8))
+        a, b = m(tile), m(tile)
+        assert a.shape == (1, 3, 256, 256), a.shape
+        assert torch.isfinite(a).all() and a.min() >= 0 and a.max() <= 1
+        assert torch.allclose(a, b, atol=1e-5)
+        return [(f"{name} weights and network", True,
+                 f"loads and returns RGB in [0, 1] deterministically ({time.perf_counter() - t:.1f}s, {dev})")]
+    except Exception as e:
+        return [(f"{name} weights and network", False, f"{type(e).__name__}: {e}")]
 
 
 # ── support bundle ───────────────────────────────────────────────────────────────────────────────────────────────────

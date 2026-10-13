@@ -20,7 +20,7 @@ docker run --rm --gpus all \
   -v "$PWD/himico_runs":/output \
   -v himico-cache:/cache \
   -e HF_TOKEN -e HIMICO_API_KEY \
-  himico:gpu run --slides /data --output /output --experiment my_cohort --patient-regex '^(TCGA-\w\w-\w{4})'
+  himico:gpu run --model insight-crc --slides /data --output /output --experiment my_cohort --patient-regex '^(TCGA-\w\w-\w{4})'
 ```
 
 * `HF_TOKEN`: a Hugging Face token whose account has been approved for [MahmoodLab/UNI](https://huggingface.co/MahmoodLab/UNI).
@@ -31,7 +31,7 @@ docker run --rm --gpus all \
 * Every `himico` command works the same way: `verify`, `report /output/my_cohort`, `bundle /output/my_cohort`, ...
 * Files are written as user 1000; add `--user "$(id -u):$(id -g)"` to write as yourself.
 
-Check the installation first: `docker run --rm --gpus all -v himico-cache:/cache -e HF_TOKEN -e HIMICO_API_KEY himico:gpu verify`.
+Check the installation first: `docker run --rm --gpus all -v himico-cache:/cache -e HF_TOKEN -e HIMICO_API_KEY himico:gpu verify --model insight-crc`.
 
 ## Offline / air-gapped sites
 

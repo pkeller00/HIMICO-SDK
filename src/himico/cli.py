@@ -3,11 +3,12 @@
     himico login                     save your HIMICO API key (free academic / commercial)
     himico account | himico logout
     himico init                      write a starter himico.yaml
-    himico run --slides /data/wsi --experiment tcga [--patient-regex RE] [--masks DIR] [--shard 0/4]
-    himico run --config himico.yaml --slides /data/wsi
+    himico run --model insight-crc --slides /data/wsi --experiment tcga [--patient-regex RE] [--masks DIR] [--shard 0/4]
+    himico run --model histochrome --slides /data/wsi --experiment mihc     virtual multiplex IHC (OME-TIFF per slide)
+    himico run --config himico.yaml --slides /data/wsi                     (the config names the model)
     himico report runs/tcga/run_1
     himico models | himico weights [--download] | himico doctor
-    himico verify [--backend URL]     known-answer check before a big run
+    himico verify --model NAME        known-answer check before a big run
     himico serve [--keys keys.json]   host models yourself; `himico keys add NAME` issues API keys
     himico bundle WORKSPACE           privacy-safe support file
     himico view WORKSPACE             browse slides with risk / tissue / QC overlays (TIAToolbox viewer)
@@ -48,9 +49,13 @@ def cmd_init(a):
 
 def cmd_run(a):
     from .config import PipelineConfig
-    from .pipeline import STAGES, Pipeline
+    from .pipeline import Pipeline
+    from .registry import models
 
     cfg = PipelineConfig.from_yaml(a.config) if a.config else PipelineConfig()
+    if not (a.model or cfg.model):
+        sys.exit("himico: choose a model with --model (or `model:` in the config file); available: "
+                 + ", ".join(sorted(models())) + ". See `himico models`.")
     over = {k: v for k, v in dict(output=a.output, experiment=a.experiment, run=a.run, variant=a.variant, model=a.model,
                                   device=a.device, batch_size=a.batch_size, workers=a.workers, mpp=a.mpp,
                                   weights_dir=a.weights_dir, backend=a.backend).items() if v is not None}
@@ -58,7 +63,7 @@ def cmd_run(a):
         over["masks"] = a.masks
     pipe = Pipeline(cfg, **over)
     cohort = _cohort(a)
-    stages = a.stages.split(",") if a.stages else STAGES
+    stages = a.stages.split(",") if a.stages else None
     preds = pipe.run(cohort, stages=stages, retry_failed=not a.skip_failed)
     if len(preds):
         print(preds.to_string(index=False, max_rows=30))
@@ -74,7 +79,8 @@ def cmd_report(a):
     df = pipe.report()
     if not len(df):
         sys.exit("no slides recorded in this workspace yet")
-    cols = ["slide_id", "patient_id", "mask", "tissue", "features", "graph", "predict", "risk", "risk_group"]
+    cols = [c for c in ("slide_id", "patient_id", "mask", "tissue", "features", "graph", "predict", "risk", "risk_group",
+                        "stain", "tiles") if c in df.columns]
     print(df[cols].to_string(index=False, max_rows=a.rows))
     failed = df[df.error != ""]
     if len(failed):
@@ -86,9 +92,13 @@ def cmd_report(a):
 def cmd_models(a):
     from .registry import feature_extractors, models
 
-    print("prediction models:")
+    print("models (himico run --model NAME):")
     for name, cls in models().items():
-        print(f"  {name:<16} {cls.description}  [features: {cls.features}]  {cls.paper}")
+        if cls.task == "risk":
+            how, extra = "API key (HIMICO server) or local weights", f"features: {cls.features}"
+        else:
+            how, extra = "runs locally; weights on request", f"{cls.tile} px tiles at {cls.mpp} um/px"
+        print(f"  {name:<14} {cls.description}\n  {'':<14} task: {cls.task}; {how}; {extra}; {cls.paper}")
     print("feature extractors:")
     for name, cls in feature_extractors().items():
         print(f"  {name:<16} dim {cls.dim}")
@@ -152,7 +162,12 @@ def cmd_doctor(a):
 def cmd_verify(a):
     from .support import verify
 
-    res = verify(a.device or "auto", a.weights_dir, a.backend or "auto", a.quick, model=not a.preprocessing_only)
+    from .registry import models
+
+    if not a.model:
+        sys.exit("himico: choose a model with --model; available: " + ", ".join(sorted(models())))
+    res = verify(a.device or "auto", a.weights_dir, a.backend or "auto", a.quick, model=not a.preprocessing_only,
+                 name=a.model)
     for name, ok, detail in res:
         print(f"  {'PASS' if ok else 'FAIL'}  {name}: {detail}")
     bad = [r for r in res if not r[1]]
@@ -272,7 +287,7 @@ def main(argv=None):
     s.add_argument("--experiment")
     s.add_argument("--run", type=int)
     s.add_argument("--variant")
-    s.add_argument("--model")
+    s.add_argument("--model", help="required: model to run, e.g. insight-crc or histochrome (see `himico models`)")
     s.add_argument("--device")
     s.add_argument("--batch-size", type=int)
     s.add_argument("--workers", type=int)
@@ -303,6 +318,7 @@ def main(argv=None):
     s.set_defaults(fn=cmd_doctor)
 
     s = sub.add_parser("verify", help="known-answer check of models and weights before a big run")
+    s.add_argument("--model", help="model to check: insight-crc | histochrome (see `himico models`)")
     s.add_argument("--device")
     s.add_argument("--weights-dir")
     s.add_argument("--backend", help="auto (default), himico, local, or a `himico serve` URL")

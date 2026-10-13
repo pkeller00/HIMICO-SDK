@@ -9,7 +9,7 @@
 #
 # Run (slides read-only, results to ./himico_runs):
 #   docker run --rm --gpus all -v /path/to/slides:/data:ro -v $PWD/himico_runs:/output -v himico-cache:/cache \
-#       -e HF_TOKEN -e HIMICO_API_KEY himico:gpu run --slides /data --output /output --experiment my_cohort
+#       -e HF_TOKEN -e HIMICO_API_KEY himico:gpu run --model insight-crc --slides /data --output /output --experiment my_cohort
 # See docker/README.md for serving, offline use and the viewer.
 
 ARG VARIANT=gpu
@@ -53,7 +53,7 @@ USER himico
 RUN --mount=type=secret,id=hf_token,uid=1000 \
     if [ "$BAKE_WEIGHTS" = "1" ]; then \
         export HF_TOKEN="$(cat /run/secrets/hf_token)" && \
-        himico weights --download && himico verify --device cpu --preprocessing-only; \
+        himico weights --download && himico verify --model insight-crc --device cpu --preprocessing-only; \
     fi
 
 VOLUME ["/output", "/cache"]

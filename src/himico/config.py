@@ -55,7 +55,7 @@ class PipelineConfig:
     run: int | None = None
     variant: str | None = None
     description: str = ""
-    model: str = "insight-crc"
+    model: str | None = None           # required: which HIMICO model to run (see `himico models`)
     device: str = "auto"               # auto | cuda | cuda:1 | mps | cpu
     batch_size: int = 64
     workers: int = 4
@@ -113,7 +113,7 @@ output: himico_runs          # workspace = <output>/<experiment>/run_<run>/<vari
 experiment: my_cohort
 run: 1
 description: ""
-model: insight-crc            # see `himico models`
+model: insight-crc            # required: insight-crc | histochrome (see `himico models`)
 device: auto                  # auto | cuda | cuda:1 | mps | cpu
 batch_size: 64
 workers: 4

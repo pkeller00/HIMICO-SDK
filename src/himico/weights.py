@@ -17,6 +17,7 @@ log = logging.getLogger("himico")
 PREPROCESSING_REPO = "pkeller01/INSIGHT-preprocessing"
 INSIGHT_REPO = "pkeller01/INSIGHT"
 UNI_REPO = "MahmoodLab/UNI"
+HISTOCHROME_REPO = "pkeller01/HistoChrome"
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,9 @@ FILES: dict[str, WeightFile] = {f.key: f for f in [
                "INSIGHT CRC tissue classifier, CC BY-NC-ND 4.0"),
     WeightFile("verify/TCGA-4N-A93T.g", PREPROCESSING_REPO, "verify/TCGA-4N-A93T.g",
                "445b375470535d38f83116a74f6ca2db17fad79e8e351c5294a122c71418d951", "public TCGA example graph for `himico verify`"),
+    WeightFile("histochrome/histochrome_he2mihc.safetensors", HISTOCHROME_REPO, "histochrome_he2mihc.safetensors",
+               "5bbdb9845232f7d21a2e3b68d4e98d17f62d1849cb154dfc1fea019eeb3633e9",
+               "HistoChrome weights are not public yet: ask the HIMICO team, then put them in --weights-dir"),
     WeightFile("uni/pytorch_model.bin", UNI_REPO, "pytorch_model.bin", None,
                "UNI is gated by its authors: request access at https://huggingface.co/MahmoodLab/UNI"),
     *[WeightFile(f"insight/fold{k}/{name}", INSIGHT_REPO, f"fold{k}/{name}", sha,

@@ -72,3 +72,31 @@ def test_server_keys_store_only_hashes(tmp_path):
     keys = load_keys(f)
     assert key not in f.read_text() and keys[_hash(key)]["tier"] == "academic"
     assert revoke_key(f, keys[_hash(key)]["id"]) and load_keys(f) == {}
+
+
+def test_band_stitcher_blends_and_keeps_background_white():
+    from himico.stages.virtual_stain import BandStitcher
+    out = np.zeros((300, 400, 3), np.uint8)
+    st = BandStitcher(out, tile=128)
+    # overlapping tiles with constant values: blended pixels must stay between them, uncovered pixels white
+    for y in (0, 100):
+        for x in (0, 100):
+            st.add(x, y, np.full((3, 128, 128), 0.2 if x == 0 else 0.6, np.float32))
+    st.finish()
+    assert out[10, 10, 0] == round(0.2 * 255) and out[10, 200, 0] == round(0.6 * 255)
+    assert round(0.2 * 255) <= out[50, 110, 0] <= round(0.6 * 255)
+    assert (out[260:, :] == 255).all() and (out[:, 260:] == 255).all()
+
+
+def test_pipeline_requires_a_model():
+    from himico import Pipeline
+    with pytest.raises(ValueError, match="choose a model"):
+        Pipeline()
+    assert Pipeline(model="histochrome").stages == ("stain",)
+
+
+def test_histochrome_network_matches_weight_names():
+    from himico.models.histochrome import StainPredictor
+    names = set(StainPredictor().state_dict())
+    assert "base_model.stain_matrix" in names and "stain_decoder.basis_module._basis" in names
+    assert len(names) == 55 and sum(p.numel() for p in StainPredictor().parameters()) == 45_596_506

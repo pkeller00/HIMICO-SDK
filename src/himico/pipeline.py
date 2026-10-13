@@ -42,7 +42,7 @@ from .registry import get_features, get_model
 from .wsi import device_for
 
 log = logging.getLogger("himico")
-STAGES = ("mask", "tissue", "features", "graphs", "predict")
+STAGES = ("mask", "tissue", "features", "graphs", "predict")   # INSIGHT-style (graph) models; see Model.stages
 # config fields that change results; a workspace refuses a different value for these
 _RESULT_FIELDS = ("model", "mask", "tissue", "features", "graph", "mpp")
 
@@ -66,7 +66,15 @@ class Pipeline:
             else:
                 raise TypeError(f"unknown option {k!r}")
         self.config = PipelineConfig.from_dict(cfg)
+        if not self.config.model:
+            from .registry import models
+            raise ValueError(f"choose a model, e.g. Pipeline(model=\"insight-crc\"); available: {sorted(models())}")
         model_cls = get_model(self.config.model)
+        self.stages = tuple(model_cls.stages)
+        if model_cls.task != "risk":
+            self.device = device_for(self.config.device)
+            self._log_path = None
+            return
         if model_cls.features != self.config.features.model:
             raise ValueError(f"model {self.config.model!r} was trained on {model_cls.features!r} features, "
                              f"but features.model is {self.config.features.model!r}")
@@ -292,22 +300,34 @@ class Pipeline:
         return self.predictions()
 
     # ── convenience ────────────────────────────────────────────────────────────────────────────────────────────────
-    def run(self, cohort: Cohort, stages: Iterable[str] = STAGES, retry_failed: bool = True) -> pd.DataFrame:
-        """Run the given stages (default: all) over the cohort and return the predictions table."""
-        stages = list(stages)
-        bad = set(stages) - set(STAGES)
+    def run(self, cohort: Cohort, stages: Iterable[str] | None = None, retry_failed: bool = True) -> pd.DataFrame:
+        """Run the given stages (default: all stages of the model) over the cohort and return its results table."""
+        stages = list(stages or self.stages)
+        bad = set(stages) - set(self.stages)
         if bad:
-            raise ValueError(f"unknown stages {sorted(bad)}; choose from {STAGES}")
+            raise ValueError(f"unknown stages {sorted(bad)} for {self.config.model}; choose from {self.stages}")
         self._prepare(cohort)
         if "predict" in stages:
             self._check_backend()
         log.info("HIMICO %s | %s | %s | workspace %s | device %s", __version__, self.config.model, cohort.summary(), self.workspace, self.device)
-        for st in STAGES:
+        for st in self.stages:
             if st in stages:
                 getattr(self, st)(cohort, retry_failed=retry_failed)
         self.report(cohort)
-        log.info("view the results on the slides with: himico view %s", self.workspace)
+        if "predict" in self.stages:
+            log.info("view the results on the slides with: himico view %s", self.workspace)
         return self.predictions()
+
+    def stain(self, cohort: Cohort, retry_failed: bool = True):
+        """Virtual staining (e.g. HistoChrome): one pyramidal OME-TIFF per slide in virtual_stain/<model>/."""
+        self._prepare(cohort)
+        from .stages.virtual_stain import run_virtual_stain
+        c = self.config
+        out = self.workspace / "virtual_stain" / c.model
+        out.mkdir(parents=True, exist_ok=True)
+        with _model(lambda: get_model(c.model)(self.device, c.weights_dir)) as model:
+            self._for_each(cohort.slides, lambda s: s.id, "stain", lambda s: (out / f"{s.id}.ome.tiff").exists(),
+                           lambda s: run_virtual_stain(model, s, out, c.batch_size, c.workers, c.mpp), retry_failed)
 
     def _check_backend(self):
         """Warn before hours of preprocessing if the predict stage will have no API key."""
@@ -319,7 +339,14 @@ class Pipeline:
                         missing_key_message(url))
 
     def predictions(self) -> pd.DataFrame:
-        """All patient predictions in the workspace (also written to predictions/<model>/predictions.csv)."""
+        """All patient predictions in the workspace (also written to predictions/<model>/predictions.csv); for virtual
+        staining models, one row per slide with its output image."""
+        if "stain" in self.stages:
+            out = self.workspace / "virtual_stain" / self.config.model
+            rows = [{"slide_id": p.name[:-len(".ome.tiff")], "image": str(p),
+                     **self._status(p.name[:-len(".ome.tiff")]).get("stain", {}).get("info", {})}
+                    for p in sorted(out.glob("*.ome.tiff"))] if out.exists() else []
+            return pd.DataFrame(rows)
         base = self.workspace / "predictions" / self.config.model
         rows = [json.loads(p.read_text()) for p in sorted((base / "patients").glob("*.json"))] if base.exists() else []
         df = pd.DataFrame(rows)
@@ -334,6 +361,17 @@ class Pipeline:
         if cohort is not None:
             man = man[man.slide_id.isin(cohort.slide_ids)]
         rows = []
+        if "stain" in self.stages:
+            for r in man.itertuples(index=False):
+                s = self._status(r.slide_id).get("stain", {})
+                rows.append({"slide_id": r.slide_id, "patient_id": r.patient_id, "stain": s.get("status", "pending"),
+                             "tiles": s.get("info", {}).get("tiles"), "error": s.get("error", "")})
+            df = pd.DataFrame(rows)
+            if len(df):
+                df.to_csv(ws / "report.csv", index=False)
+                log.info("report: %d slides, %d stained, %d failed -> %s", len(df), (df.stain == "done").sum(),
+                         (df.stain == "failed").sum(), ws / "report.csv")
+            return df
         for r in man.itertuples(index=False):
             st, pst = self._status(r.slide_id), self._status(f"patient__{_safe(str(r.patient_id))}")
             row = {"slide_id": r.slide_id, "patient_id": r.patient_id}
