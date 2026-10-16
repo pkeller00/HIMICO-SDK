@@ -121,3 +121,21 @@ def test_update_check(monkeypatch):
     monkeypatch.setattr(remote, "ping", lambda base: (_ for _ in ()).throw(OSError("offline")))
     check("http://x")                                   # unreachable server never blocks
     check(None)                                         # local backend: nothing to check
+
+
+def test_cohort_ignores_output_folder(tmp_path):
+    import pytest
+    from himico import Cohort
+
+    (tmp_path / "R1-x.svs").write_bytes(b"x")
+    ws = tmp_path / "himico_runs" / "exp" / "run_1"
+    (ws / "status").mkdir(parents=True)
+    (ws / "viewer" / "slides").mkdir(parents=True)
+    (ws / "config.yaml").write_text("a: 1")
+    (ws / "cohort.csv").write_text("a")
+    (ws / "viewer" / "slides" / "R1-x.svs").symlink_to(tmp_path / "R1-x.svs")
+    assert Cohort.from_folder(tmp_path).slide_ids == ["R1-x"]          # the workspace's links are not input
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "R1-x.svs").write_bytes(b"x")
+    with pytest.raises(ValueError, match="more than once"):
+        Cohort.from_folder(tmp_path)                                   # a real second copy still errors, with paths

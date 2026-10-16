@@ -49,7 +49,9 @@ class Cohort:
             raise ValueError(
                 f"{len(dup)} slide id(s) occur more than once (the id is the file name without its extension, so the "
                 f"same name in two folders, or one slide saved in two formats, clashes). Remove the extra copy, use "
-                f"--no-recursive, or list the slides in a CSV with unique slide_id values:\n{shown}")
+                f"--no-recursive, or list the slides in a CSV with unique slide_id values. If one of the paths is "
+                f"inside a HIMICO output folder (himico_runs/...), keep the output folder outside the slides "
+                f"folder:\n{shown}")
 
     # ── constructors ───────────────────────────────────────────────────────────────────────────────────────────────
     @classmethod
@@ -62,7 +64,10 @@ class Cohort:
             raise FileNotFoundError(folder)
         exts = tuple(e.lower() for e in extensions)
         files = folder.rglob("*") if recursive else folder.iterdir()
-        paths = sorted(p for p in files if p.is_file() and p.name.lower().endswith(exts) and not p.name.startswith("."))
+        # HIMICO's own output (e.g. himico_runs/<experiment>/viewer/slides holds links to the slides) is not input
+        out = [c.parent for c in folder.rglob("config.yaml") if (c.parent / "cohort.csv").exists() and (c.parent / "status").is_dir()] if recursive else []
+        paths = sorted(p for p in files if p.is_file() and p.name.lower().endswith(exts) and not p.name.startswith(".")
+                       and not any(o in p.parents for o in out))
         rx = re.compile(patient) if patient else None
         slides = []
         for p in paths:
