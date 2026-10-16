@@ -2,7 +2,7 @@
 
 Builds <workspace>/viewer/ with
     slides/     links to the original slide files (nothing is copied)
-    overlays/   per slide: <stem>_insight_risk.db   INSIGHT local risk per patch (colour by `risk`, 0-1)
+    overlays/   per slide: <stem>_insight_risk.db   INSIGHT local risk per patch (colour by `insight_risk`, 0-1)
                            <stem>_tissue_types.db   CRC tissue class per tile (colour by `max_class`)
                            <stem>_qc_artefacts.png  GrandQC artefact map (fold, dark spot, pen, edge/bubble, out of focus)
 and starts `tiatoolbox visualize` on it. In the viewer, pick a slide on the left, then add overlays from the list;
@@ -74,7 +74,7 @@ def prepare(workspace: str | Path) -> Path:
             n_ov += 1
     # viewer settings (keys read by the TIAToolbox viewer): colour by risk with blue-to-red, fixed tissue colours
     (odir / "config.json").write_text(json.dumps({
-        "default_cprop": "risk",
+        "default_cprop": "insight_risk",
         "UI_settings": {"mapper": "coolwarm", "max_scale": 1000},  # draw patches even at whole-slide zoom
         "opts": {"hover_on": 1},
         # RGBA: the viewer draws a class with only three values (RGB) fully transparent
@@ -85,7 +85,7 @@ def prepare(workspace: str | Path) -> Path:
     (out / "README.txt").write_text(
         "Open with: himico view <workspace>  (or: tiatoolbox visualize --slides slides --overlays overlays)\n"
         "Overlays per slide:\n"
-        "  *_insight_risk.db   INSIGHT local risk per patch; colour by 'risk' (0 = lower, 1 = higher risk)\n"
+        "  *_insight_risk.db   INSIGHT local risk per patch; colour by 'insight_risk' (0 = lower, 1 = higher risk)\n"
         "  *_tissue_types.db   CRC tissue type per tile; colour by 'max_class'\n"
         "  *_qc_artefacts.png  GrandQC artefacts: orange fold, green dark spot, red pen, pink edge/bubble, violet out of focus\n")
     return out

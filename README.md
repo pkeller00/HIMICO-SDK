@@ -117,7 +117,7 @@ Pick a slide on the left, then **Add Overlay**:
 
 | Overlay | Shows | Colour by |
 |---|---|---|
-| `<slide>_insight_risk.db` | INSIGHT local risk per patch (0 = lower, 1 = higher) | `risk` (blue to red) |
+| `<slide>_insight_risk.db` | INSIGHT local risk per patch (0 = lower, 1 = higher) | `insight_risk` (blue to red) |
 | `<slide>_tissue_types.db` | CRC tissue type per tile | `max_class` |
 | `<slide>_qc_artefacts.png` | GrandQC artefacts (folds, pen, out of focus, ...) | fixed colours |
 

@@ -14,14 +14,13 @@ def rdbu(v: np.ndarray) -> np.ndarray:
     return (colormaps["RdBu_r"](np.clip(v, 0, 1))[..., :3] * 255).astype(np.uint8)
 
 
-def write_overlay(path: Path, bounds_baseline: np.ndarray, values: np.ndarray, name: str = "risk"):
-    """One square per patch with the local value; open in the TIAToolbox viewer or the INSIGHT website.
-    `surv_time` duplicates the value for tools built on the original INSIGHT overlays."""
+def write_overlay(path: Path, bounds_baseline: np.ndarray, values: np.ndarray, name: str = "insight_risk"):
+    """One square per patch with the local value as the single property `name`; open in the TIAToolbox viewer."""
     from shapely.geometry import box
     from tiatoolbox.annotation.storage import Annotation, SQLiteStore
 
     store = SQLiteStore()
-    store.append_many([Annotation(box(*b), {name: float(v), "surv_time": float(v)}) for b, v in zip(bounds_baseline, values)])
+    store.append_many([Annotation(box(*b), {name: float(v)}) for b, v in zip(bounds_baseline, values)])
     store.dump(str(path))
     store.close()
 
