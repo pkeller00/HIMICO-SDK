@@ -1,15 +1,80 @@
 # HIMICO SDK
 
-One SDK for the HIMICO group's computational pathology models: from raw whole-slide images to patient-level
-predictions and patch-level maps, in one resumable command. Models available:
+Run the HIMICO group's computational pathology models on your own whole-slide images, from raw slides to patient-level
+predictions and patch-level maps, in one resumable command.
 
 | Model | Task | Paper |
 |---|---|---|
-| `insight-crc` | **INSIGHT**: overall-survival risk, risk groups and patch-level risk maps in stage II/III colorectal cancer | [arXiv:2512.22262](https://arxiv.org/abs/2512.22262) |
-| `histochrome` | **HistoChrome**: virtual multiplex IHC from H&E, as a whole-slide image ([details](#histochrome-virtual-multiplex-ihc)) | [HistoChromeCode](https://github.com/measty/HistoChromeCode) |
-| SPARROW, ... | coming soon | |
+| `insight-crc` | **INSIGHT**: survival risk, risk groups and patch-level risk maps in stage II/III colorectal cancer | [arXiv:2512.22262](https://arxiv.org/abs/2512.22262) |
+| `histochrome` | **HistoChrome**: virtual multiplex IHC from H&E ([details](#histochrome-virtual-multiplex-ihc)) | [HistoChromeCode](https://github.com/measty/HistoChromeCode) |
 
-Every command that runs a model names it with `--model` (or `model:` in a config file); `himico models` lists them.
+**How it works.** Slide processing (tissue masking, feature extraction, graph building) runs on your own machine. For
+INSIGHT, only the patient graph (patch features and edges: no images, coordinates or IDs) is sent to the HIMICO server
+at the University of Warwick, which holds the model and returns the prediction. Graphs are not stored or logged.
+
+## 1. Install, log in, verify
+
+```bash
+pip install git+https://github.com/pkeller00/HIMICO-SDK   # Python 3.10 or newer; a CUDA GPU is recommended
+pip install openslide-bin                                 # to read .svs / .ndpi / .mrxs slides
+
+himico login            # paste your HIMICO API key (request one: Piotr.Keller@warwick.ac.uk, free for academic research)
+hf auth login           # Hugging Face account approved for the UNI feature extractor (https://huggingface.co/MahmoodLab/UNI)
+
+himico verify --model insight-crc --quick   # checks your key and the server with a known example (expect risk 0.237, High)
+```
+
+`himico doctor` checks your packages, GPU, logins and key if something does not work.
+
+## 2. Run INSIGHT on your cohort
+
+Put your slides in one folder and point the SDK at it:
+
+```bash
+himico verify --model insight-crc                # full check, once: also loads the preprocessing models on a test tile
+
+himico run --model insight-crc --slides /path/to/slides --experiment my_cohort
+```
+
+If a patient has several slides, tell it how to get the patient ID from the file name (all of a patient's slides are
+merged into one graph), for example `--patient-regex '^(TCGA-\w\w-\w{4})'`.
+
+The run is resumable: if it stops, run the same command again. Results are in `himico_runs/my_cohort/`:
+
+```
+predictions/insight-crc/predictions.csv    one row per patient: risk, risk_group (High / Low), fold scores
+predictions/insight-crc/heatmaps/          patch-level risk drawn over each slide
+report.csv                                 per-slide status and any errors
+```
+
+Browse the maps with `himico view himico_runs/my_cohort`.
+
+### Already have patient graphs?
+
+If you already built INSIGHT patient graphs (`.g` files), skip slide processing and score them directly:
+
+```python
+from pathlib import Path
+import pandas as pd
+from himico.auth import server_url
+from himico.registry import get_model
+from himico.safe_graph import load_graph
+from himico.models.remote import RemotePredictor
+import himico.models  # registers insight-crc
+
+pred = RemotePredictor(server_url(), "insight-crc", get_model("insight-crc"))
+rows = []
+for f in sorted(Path("/path/to/graphs").glob("*.g")):
+    r = pred.predict(load_graph(f.read_bytes()))
+    rows.append({"patient": f.stem, "risk": r.risk, "risk_group": r.group})
+pd.DataFrame(rows).to_csv("predictions.csv", index=False)
+```
+
+---
+
+# More
+
+## Pipeline
 
 ```
 slides ──► 1 mask ──► 2 tissue ──► 3 features ──► 4 graphs ──► 5 predict
@@ -20,36 +85,18 @@ slides ──► 1 mask ──► 2 tissue ──► 3 features ──► 4 grap
 Stages 1-4 always run on your own hardware. Every stage runs over the whole cohort, caches its result per slide, and
 is skipped on the next run once done. Failed slides are recorded and retried; one bad slide never stops a cohort.
 
-## Install
+## API key
 
 ```bash
-pip install git+https://github.com/pkeller00/HIMICO-SDK    # Python ≥ 3.10; a CUDA GPU is recommended for cohorts
-himico doctor                     # checks packages, GPU, Hugging Face login, weights and your API key
+himico login      # prompts for the key; stored in ~/.config/himico/credentials.json (mode 600)
+himico account    # name, tier and models of your key
+# clusters: export HIMICO_API_KEY=... instead
 ```
 
-Reading `.svs`, `.ndpi` or `.mrxs` slides needs OpenSlide (`pip install openslide-bin` or your OS package).
-
-### API key
-
-Model weights (INSIGHT and future HIMICO models) are not distributed. Predictions run on the HIMICO server at the
-University of Warwick: for each patient the SDK sends only the UNI patch features and the graph edges (no images,
-no patch coordinates, no slide or patient IDs) and receives the prediction and patch-level map. Graphs are not
-stored or logged.
-
-1. Request a key: free for non-commercial academic research; commercial licences on request
-   (Piotr.Keller@warwick.ac.uk).
-2. Save it once:
-
-```bash
-himico login                     # prompts for the key; stored in ~/.config/himico/credentials.json (mode 600)
-himico account                   # name, tier and models of your key
-# clusters / containers: export HIMICO_API_KEY=... instead
-```
-
-The model runs on the HIMICO server by default. `backend` can also be the URL of a `himico serve` server. The pipeline
+Free for non-commercial academic research; commercial licences on request (Piotr.Keller@warwick.ac.uk). The pipeline
 warns at the start of a run if no key is set, so preprocessing a cohort never ends in a surprise.
 
-### Preprocessing weights
+## Preprocessing weights
 
 | Component | Source | Access |
 |---|---|---|
@@ -59,28 +106,6 @@ warns at the start of a run if no key is set, so preprocessing a cohort never en
 
 These download on first use and are cached. On machines without internet, copy them into a folder and pass
 `--weights-dir` (layout: `himico weights --weights-dir DIR`). No access tokens are stored in this package.
-
-## Quick start
-
-```bash
-himico run --model insight-crc --slides /data/tcga_crc --experiment tcga --patient-regex '^(TCGA-\w\w-\w{4})'
-```
-
-Results land in `himico_runs/tcga/`:
-
-```
-predictions/insight-crc/predictions.csv     patient_id, score, risk, risk_group, fold scores, n_patches, n_slides
-predictions/insight-crc/heatmaps/<slide>.png    predictions/insight-crc/thumbnails/<slide>.jpg  (risk over H&E)
-predictions/insight-crc/overlays/<slide>.db  TIAToolbox overlay: open in the TIA viewer with the slide
-report.csv                                   per-slide status, usable tissue area, patch counts, errors
-```
-
-Before a big run, check that everything is installed correctly:
-
-```bash
-himico verify --model insight-crc   # sends the example TCGA graph to the server and checks the known answer (risk 0.237,
-                      # High), then loads GrandQC, the tissue classifier and UNI on a test tile
-```
 
 ## Looking at the results
 
@@ -186,7 +211,7 @@ attach it to an issue or email.
 ```
 
 Patient graphs keep the INSIGHT training format (`x`, `edge_index`, `coords`, `slideOrder`) and add `slide_ptr`
-(node range of each slide), so they also run on the INSIGHT website's "Try INSIGHT" upload.
+(node range of each slide).
 
 ## Adding a model
 
