@@ -95,7 +95,7 @@ def cmd_models(a):
     print("models (himico run --model NAME):")
     for name, cls in models().items():
         if cls.task == "risk":
-            how, extra = "API key (HIMICO server) or local weights", f"features: {cls.features}"
+            how, extra = "API key (HIMICO server)", f"features: {cls.features}"
         else:
             how, extra = "runs locally; weights on request", f"{cls.tile} px tiles at {cls.mpp} um/px"
         print(f"  {name:<14} {cls.description}\n  {'':<14} task: {cls.task}; {how}; {extra}; {cls.paper}")
@@ -293,8 +293,7 @@ def main(argv=None):
     s.add_argument("--workers", type=int)
     s.add_argument("--mpp", type=float, help="fallback microns-per-pixel for slides without it")
     s.add_argument("--weights-dir")
-    s.add_argument("--backend", help="where the model runs: auto (default: local weights if present, else the HIMICO "
-                                     "server), himico, local, or a `himico serve` URL")
+    s.add_argument("--backend", help="where the model runs: the HIMICO server (default) or a `himico serve` URL")
     s.add_argument("--stages", help="comma list of mask,tissue,features,graphs,predict (default: all)")
     s.add_argument("--shard", help="i/n: process every n-th patient starting at i (for array jobs)")
     s.add_argument("--skip-failed", action="store_true", help="do not retry slides that failed before")
@@ -321,7 +320,7 @@ def main(argv=None):
     s.add_argument("--model", help="model to check: insight-crc | histochrome (see `himico models`)")
     s.add_argument("--device")
     s.add_argument("--weights-dir")
-    s.add_argument("--backend", help="auto (default), himico, local, or a `himico serve` URL")
+    s.add_argument("--backend", help="the HIMICO server (default) or a `himico serve` URL")
     s.add_argument("--quick", action="store_true", help="only the INSIGHT model check")
     s.add_argument("--preprocessing-only", action="store_true", help="skip the model check (no API key needed)")
     s.set_defaults(fn=cmd_verify)

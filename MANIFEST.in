@@ -1,5 +1,4 @@
 include LICENSE README.md
 include src/himico/_qhull_legacy.c
 recursive-include src/himico/_qhull *.c *.h *.txt *.md README.scipy
-recursive-include docker *
 recursive-include examples *

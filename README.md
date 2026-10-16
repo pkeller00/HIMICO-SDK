@@ -14,7 +14,7 @@ Every command that runs a model names it with `--model` (or `model:` in a config
 ```
 slides ──► 1 mask ──► 2 tissue ──► 3 features ──► 4 graphs ──► 5 predict
           GrandQC     CRC tissue     UNI          slide +       model on the HIMICO server
-          (or yours)  types          embeddings   patient       (or local weights) + overlays/heatmaps
+          (or yours)  types          embeddings   patient       + overlays/heatmaps
 ```
 
 Stages 1-4 always run on your own hardware. Every stage runs over the whole cohort, caches its result per slide, and
@@ -28,10 +28,6 @@ himico doctor                     # checks packages, GPU, Hugging Face login, we
 ```
 
 Reading `.svs`, `.ndpi` or `.mrxs` slides needs OpenSlide (`pip install openslide-bin` or your OS package).
-The `insight` command from earlier versions still works as an alias of `himico`.
-
-Hospitals and clusters can use the Docker image instead (GPU and CPU variants, optional offline build with weights):
-see [docker/README.md](docker/README.md).
 
 ### API key
 
@@ -50,8 +46,7 @@ himico account                   # name, tier and models of your key
 # clusters / containers: export HIMICO_API_KEY=... instead
 ```
 
-`backend` decides where the model runs: `auto` (default) uses local weights if you were given them (in
-`--weights-dir`), otherwise the HIMICO server; `himico` always uses the server; `local` never does. The pipeline
+The model runs on the HIMICO server by default. `backend` can also be the URL of a `himico serve` server. The pipeline
 warns at the start of a run if no key is set, so preprocessing a cohort never ends in a surprise.
 
 ### Preprocessing weights

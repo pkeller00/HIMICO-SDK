@@ -1,9 +1,7 @@
-"""Run a model on a HIMICO server instead of local weights.
+"""Run a model on a HIMICO server.
 
-    Pipeline()                                       # backend "auto": local weights if present, else the HIMICO server
-    Pipeline(backend="himico")                       # always the hosted server (API key: `himico login` / HIMICO_API_KEY)
+    Pipeline()                                       # the HIMICO server (API key: `himico login` / HIMICO_API_KEY)
     Pipeline(backend="http://gpu-box:8080")          # a self-hosted `himico serve`
-    Pipeline(backend="local")                        # local weights only (weights_dir or Hugging Face access)
 
 Protocol (served by `himico serve` and by the hosted server):
     GET  /ping                 {"status", "version", "models", "auth"}    no key needed
@@ -88,8 +86,7 @@ def _request(url: str, data: bytes | None = None, timeout: float = 600, key: str
             if attempt < attempts and data is not None:
                 time.sleep(2 ** attempt)
                 continue
-            hint = ("the hosted HIMICO server may not be live yet or is under maintenance; use backend 'local' with "
-                    f"weights you have been given, or contact {CONTACT}" if base == server_url()
+            hint = (f"the hosted HIMICO server may be under maintenance; try again later or contact {CONTACT}" if base == server_url()
                     else "is `himico serve` running?")
             raise RemoteError(f"cannot reach {base} ({e.reason}); {hint}") from None
 

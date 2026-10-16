@@ -61,7 +61,7 @@ class PipelineConfig:
     workers: int = 4
     mpp: float | None = None           # fallback microns-per-pixel for slides that lack it
     weights_dir: str | None = None     # local folder with weights (otherwise Hugging Face)
-    backend: str | None = "auto"       # where the model runs: auto | himico | local | URL of a `himico serve` server
+    backend: str | None = "auto"       # where the model runs: the HIMICO server by default, or the URL of a `himico serve` server
     mask: MaskConfig = field(default_factory=MaskConfig)
     tissue: TissueConfig = field(default_factory=TissueConfig)
     features: FeatureConfig = field(default_factory=FeatureConfig)
@@ -118,9 +118,8 @@ device: auto                  # auto | cuda | cuda:1 | mps | cpu
 batch_size: 64
 workers: 4
 mpp: null                     # fallback microns-per-pixel if a slide does not record it
-weights_dir: null             # folder with local weights; otherwise downloaded from Hugging Face
-backend: auto                 # auto: local model weights if you have them, else the HIMICO server (API key:
-                              #   `himico login`); himico | local | http://gpu-server:8080 (a `himico serve` server)
+weights_dir: null             # folder with the preprocessing weights; otherwise downloaded from Hugging Face
+backend: auto                 # the HIMICO server (API key: `himico login`), or http://gpu-server:8080 (a `himico serve` server)
 
 mask:
   source: grandqc             # or a folder of <slide>.png masks you made yourself
