@@ -4,7 +4,6 @@
     himico account | himico logout
     himico init                      write a starter himico.yaml
     himico run --model insight-crc --slides /data/wsi --experiment tcga [--patient-regex RE] [--masks DIR] [--shard 0/4]
-    himico run --model histochrome --slides /data/wsi --experiment mihc     virtual multiplex IHC (OME-TIFF per slide)
     himico run --config himico.yaml --slides /data/wsi                     (the config names the model)
     himico report runs/tcga/run_1
     himico models | himico weights [--download] | himico doctor
@@ -294,7 +293,7 @@ def main(argv=None):
     s.add_argument("--experiment")
     s.add_argument("--run", type=int)
     s.add_argument("--variant")
-    s.add_argument("--model", help="required: model to run, e.g. insight-crc or histochrome (see `himico models`)")
+    s.add_argument("--model", help="required: model to run, e.g. insight-crc (see `himico models`)")
     s.add_argument("--device")
     s.add_argument("--batch-size", type=int)
     s.add_argument("--workers", type=int)
@@ -325,7 +324,7 @@ def main(argv=None):
     s.set_defaults(fn=cmd_doctor)
 
     s = sub.add_parser("verify", help="known-answer check of models and weights before a big run")
-    s.add_argument("--model", help="model to check: insight-crc | histochrome (see `himico models`)")
+    s.add_argument("--model", help="model to check: insight-crc (see `himico models`)")
     s.add_argument("--device")
     s.add_argument("--weights-dir")
     s.add_argument("--backend", help="the HIMICO server (default) or a `himico serve` URL")

@@ -6,7 +6,6 @@ predictions and patch-level maps, in one resumable command.
 | Model | Task | Paper |
 |---|---|---|
 | `insight-crc` | **INSIGHT**: survival risk, risk groups and patch-level risk maps in stage II/III colorectal cancer | [arXiv:2512.22262](https://arxiv.org/abs/2512.22262) |
-| `histochrome` | **HistoChrome**: virtual multiplex IHC from H&E ([details](#histochrome-virtual-multiplex-ihc)) | [HistoChromeCode](https://github.com/measty/HistoChromeCode) |
 
 **How it works.** Slide processing (tissue masking, feature extraction, graph building) runs on your own machine. For
 INSIGHT, only the patient graph (patch features and edges: no images, coordinates or IDs) is sent to the HIMICO server
@@ -167,31 +166,6 @@ writes into the same workspace. Pin a GPU with `--device cuda:1`.
 **One config file.** `himico init` writes `himico.yaml` with every option; run it with `himico run --config himico.yaml --slides DIR` (the file names the model).
 The resolved config is saved to the workspace; a workspace refuses to mix results from different settings, so use a
 new `--run` or `--variant` to compare settings side by side.
-
-## HistoChrome: virtual multiplex IHC
-
-HistoChrome (HIMICO, [HistoChromeCode](https://github.com/measty/HistoChromeCode)) turns a routine H&E slide into a
-virtual 5-marker multiplex immunohistochemistry (mIHC) image. It runs entirely on your own hardware; no API key is
-involved. **The weights are not public yet**: ask the HIMICO team, then put the file at
-`<weights_dir>/histochrome/histochrome_he2mihc.safetensors` (or use a Hugging Face account that has been given access).
-
-```bash
-himico verify --model histochrome --weights-dir /path/to/weights
-himico run --model histochrome --slides /data/he_slides --experiment mihc --weights-dir /path/to/weights
-```
-
-```
-<output>/<experiment>/virtual_stain/histochrome/<slide>.ome.tiff    pyramidal OME-TIFF (RGB, JPEG q87) at 0.5 um/px
-<output>/<experiment>/virtual_stain/histochrome/<slide>_thumb.jpg   quick look
-report.csv                                                       per-slide status, tiles, errors
-```
-
-Each slide is read in 832 px tiles at 0.5 um/px with 96 px overlap; only tiles with at least 20% tissue (Otsu mask)
-are processed, overlaps are blended with a Hann window and the background is white, exactly as in HistoChromeCode's
-`infer.py` (the SDK's network gives identical output on real H&E tiles). Tiles are stitched in a rolling band of
-rows, so no large temporary canvas is needed (about 0.7 GB of memory for a 50,000 px wide slide). A GPU is strongly
-recommended: an 832 px tile takes about 3 s on a laptop GPU and about 30 s on a laptop CPU. Open the result in QuPath
-or any OME-TIFF viewer.
 
 ## Getting help
 

@@ -3,7 +3,7 @@ output: himico_runs          # workspace = <output>/<experiment>/run_<run>/<vari
 experiment: my_cohort
 run: 1
 description: ""
-model: insight-crc            # required: insight-crc | histochrome (see `himico models`)
+model: insight-crc            # required: insight-crc (see `himico models`)
 device: auto                  # auto | cuda | cuda:1 | mps | cpu
 batch_size: 64
 workers: 4
