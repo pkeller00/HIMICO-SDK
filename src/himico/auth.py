@@ -16,6 +16,7 @@ from pathlib import Path
 
 DEFAULT_SERVER = "https://insight.dcs.warwick.ac.uk/api/himico"   # interim host; the dedicated server will replace it
 KEY_URL = "https://github.com/pkeller00/HIMICO-SDK#api-key"     # how to request a key (until the server has a sign-up page)
+SDK_URL = "https://github.com/pkeller00/HIMICO-SDK"
 CONTACT = "Piotr.Keller@warwick.ac.uk"
 
 

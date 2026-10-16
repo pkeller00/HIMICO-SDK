@@ -38,7 +38,7 @@ from . import __version__
 from .cohort import Cohort, Slide
 from .config import PipelineConfig
 from .log import setup as setup_logging
-from .registry import get_features, get_model
+from .registry import get_features, get_model, models
 from .wsi import device_for
 
 log = logging.getLogger("himico")
@@ -306,6 +306,7 @@ class Pipeline:
         bad = set(stages) - set(self.stages)
         if bad:
             raise ValueError(f"unknown stages {sorted(bad)} for {self.config.model}; choose from {self.stages}")
+        self._check_update()
         self._prepare(cohort)
         if "predict" in stages:
             self._check_backend()
@@ -328,6 +329,14 @@ class Pipeline:
         with _model(lambda: get_model(c.model)(self.device, c.weights_dir)) as model:
             self._for_each(cohort.slides, lambda s: s.id, "stain", lambda s: (out / f"{s.id}.ome.tiff").exists(),
                            lambda s: run_virtual_stain(model, s, out, c.batch_size, c.workers, c.mpp), retry_failed)
+
+    def _check_update(self):
+        """Stop before any work if the server offers a newer SDK (see update.py)."""
+        from .models.remote import resolve_backend
+        from .update import check
+
+        if self.config.model in models():
+            check(resolve_backend(self.config.backend, get_model(self.config.model), self.config.weights_dir))
 
     def _check_backend(self):
         """Warn before hours of preprocessing if the predict stage will have no API key."""

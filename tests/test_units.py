@@ -100,3 +100,24 @@ def test_histochrome_network_matches_weight_names():
     names = set(StainPredictor().state_dict())
     assert "base_model.stain_matrix" in names and "stain_decoder.basis_module._basis" in names
     assert len(names) == 55 and sum(p.numel() for p in StainPredictor().parameters()) == 45_596_506
+
+
+def test_update_check(monkeypatch):
+    import pytest
+    from himico import __version__
+    from himico.models import remote
+    from himico.update import UpdateRequired, _v, check
+
+    assert _v("0.10.0") > _v("0.9.9") and _v("1.0") == _v("1.0.0")
+    monkeypatch.delenv("HIMICO_NO_UPDATE_CHECK", raising=False)
+    monkeypatch.setattr(remote, "ping", lambda base: {"latest_sdk": "99.0.0"})
+    with pytest.raises(UpdateRequired, match="pip install"):
+        check("http://x")
+    monkeypatch.setenv("HIMICO_NO_UPDATE_CHECK", "1")
+    check("http://x")                                   # skipped on request
+    monkeypatch.delenv("HIMICO_NO_UPDATE_CHECK")
+    monkeypatch.setattr(remote, "ping", lambda base: {"latest_sdk": __version__})
+    check("http://x")                                   # up to date
+    monkeypatch.setattr(remote, "ping", lambda base: (_ for _ in ()).throw(OSError("offline")))
+    check("http://x")                                   # unreachable server never blocks
+    check(None)                                         # local backend: nothing to check

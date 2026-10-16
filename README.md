@@ -49,6 +49,9 @@ report.csv                                 per-slide status and any errors
 
 Browse the maps with `himico view himico_runs/my_cohort`.
 
+Before each run the SDK checks whether a newer version is available and, if so, stops and shows the upgrade command:
+`pip install --upgrade --force-reinstall --no-deps git+https://github.com/pkeller00/HIMICO-SDK`.
+
 ### Already have patient graphs?
 
 If you already built INSIGHT patient graphs (`.g` files), skip slide processing and score them directly:

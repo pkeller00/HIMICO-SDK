@@ -5,7 +5,7 @@
     cohort = Cohort.from_folder("/data/wsi")
     preds = Pipeline(output="runs", experiment="my_cohort", run=1).run(cohort)
 """
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 from .cohort import Cohort, Slide  # noqa: E402
 from .config import PipelineConfig  # noqa: E402

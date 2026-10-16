@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -56,6 +57,8 @@ def cmd_run(a):
     if not (a.model or cfg.model):
         sys.exit("himico: choose a model with --model (or `model:` in the config file); available: "
                  + ", ".join(sorted(models())) + ". See `himico models`.")
+    if a.no_update_check:
+        os.environ["HIMICO_NO_UPDATE_CHECK"] = "1"
     over = {k: v for k, v in dict(output=a.output, experiment=a.experiment, run=a.run, variant=a.variant, model=a.model,
                                   device=a.device, batch_size=a.batch_size, workers=a.workers, mpp=a.mpp,
                                   weights_dir=a.weights_dir, backend=a.backend).items() if v is not None}
@@ -64,7 +67,11 @@ def cmd_run(a):
     pipe = Pipeline(cfg, **over)
     cohort = _cohort(a)
     stages = a.stages.split(",") if a.stages else None
-    preds = pipe.run(cohort, stages=stages, retry_failed=not a.skip_failed)
+    from .update import UpdateRequired
+    try:
+        preds = pipe.run(cohort, stages=stages, retry_failed=not a.skip_failed)
+    except UpdateRequired as e:
+        sys.exit(f"himico: {e}")
     if len(preds):
         print(preds.to_string(index=False, max_rows=30))
     print(f"\nworkspace: {pipe.workspace}")
@@ -297,6 +304,7 @@ def main(argv=None):
     s.add_argument("--stages", help="comma list of mask,tissue,features,graphs,predict (default: all)")
     s.add_argument("--shard", help="i/n: process every n-th patient starting at i (for array jobs)")
     s.add_argument("--skip-failed", action="store_true", help="do not retry slides that failed before")
+    s.add_argument("--no-update-check", action="store_true", help="run even if a newer SDK version is available")
     s.set_defaults(fn=cmd_run)
 
     s = sub.add_parser("report", help="per-slide status of a workspace")

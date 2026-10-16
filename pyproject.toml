@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "himico-sdk"
-version = "0.3.0"
+version = "0.3.1"
 description = "HIMICO SDK: run HIMICO computational pathology models (INSIGHT, SPARROW, ...) on whole-slide image cohorts"
 readme = "README.md"
 requires-python = ">=3.10"
