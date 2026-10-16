@@ -77,8 +77,10 @@ def prepare(workspace: str | Path) -> Path:
         "default_cprop": "risk",
         "UI_settings": {"mapper": "coolwarm", "max_scale": 1000},  # draw patches even at whole-slide zoom
         "opts": {"hover_on": 1},
-        "color_dict": {"TUM": [220, 38, 38], "NORM": [51, 160, 44], "LYM": [106, 61, 154], "MUS": [247, 129, 191],
-                       "STR": [255, 127, 0], "DEB": [128, 128, 128], "MUC": [102, 194, 219], "ADI": [242, 217, 51]},
+        # RGBA: the viewer draws a class with only three values (RGB) fully transparent
+        "color_dict": {"TUM": [220, 38, 38, 255], "NORM": [51, 160, 44, 255], "LYM": [106, 61, 154, 255],
+                       "MUS": [247, 129, 191, 255], "STR": [255, 127, 0, 255], "DEB": [128, 128, 128, 255],
+                       "MUC": [102, 194, 219, 255], "ADI": [242, 217, 51, 255]},
     }, indent=1))
     (out / "README.txt").write_text(
         "Open with: himico view <workspace>  (or: tiatoolbox visualize --slides slides --overlays overlays)\n"
