@@ -40,10 +40,16 @@ class Cohort:
     def __init__(self, slides: Iterable[Slide], name: str = "cohort"):
         self.slides = list(slides)
         self.name = name
-        ids = [s.id for s in self.slides]
-        dup = {i for i in ids if ids.count(i) > 1}
+        seen: dict[str, list[Path]] = {}
+        for s in self.slides:
+            seen.setdefault(s.id, []).append(s.path)
+        dup = {i: ps for i, ps in seen.items() if len(ps) > 1}
         if dup:
-            raise ValueError(f"duplicate slide ids: {sorted(dup)[:5]}")
+            shown = "\n".join(f"  {i}: " + ", ".join(str(p) for p in ps[:3]) for i, ps in sorted(dup.items())[:5])
+            raise ValueError(
+                f"{len(dup)} slide id(s) occur more than once (the id is the file name without its extension, so the "
+                f"same name in two folders, or one slide saved in two formats, clashes). Remove the extra copy, use "
+                f"--no-recursive, or list the slides in a CSV with unique slide_id values:\n{shown}")
 
     # ── constructors ───────────────────────────────────────────────────────────────────────────────────────────────
     @classmethod
