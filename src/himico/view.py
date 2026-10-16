@@ -4,7 +4,7 @@ Builds <workspace>/viewer/ with
     slides/     links to the original slide files (nothing is copied)
     overlays/   per slide: <stem>_insight_risk.db   INSIGHT local risk per patch (colour by `insight_risk`, 0-1)
                            <stem>_tissue_types.db   CRC tissue class per tile (colour by `max_class`)
-                           <stem>_qc_artefacts.png  GrandQC artefact map (fold, dark spot, pen, edge/bubble, out of focus)
+                           <stem>_qc_artefacts.db   GrandQC artefact regions (colour by `artefact`: fold, dark spot, pen, edge/bubble, out of focus)
 and starts `tiatoolbox visualize` on it. In the viewer, pick a slide on the left, then add overlays from the list;
 overlays are matched to slides by file name.
 """
@@ -21,6 +21,7 @@ import pandas as pd
 import yaml
 from PIL import Image
 
+from .outputs import QC_NAMES, write_qc_overlay
 from .stages.mask import QC_COLOURS
 
 
@@ -39,6 +40,7 @@ def prepare(workspace: str | Path) -> Path:
         raise FileNotFoundError(f"{ws} is not a HIMICO workspace (no config.yaml)")
     cfg = yaml.safe_load((ws / "config.yaml").read_text())
     model = cfg.get("model", "insight-crc")
+    qc_mpp = float((cfg.get("mask") or {}).get("qc_mpp", 1.5))
     out = ws / "viewer"
     sdir, odir = out / "slides", out / "overlays"
     sdir.mkdir(parents=True, exist_ok=True)
@@ -62,14 +64,13 @@ def prepare(workspace: str | Path) -> Path:
             _link(tissue, odir / f"{stem}_tissue_types.db")
             n_ov += 1
         qc = ws / "masks" / "qc" / f"{r.slide_id}_classes.png"
-        target = odir / f"{stem}_qc_artefacts.png"
+        target = odir / f"{stem}_qc_artefacts.db"
+        (odir / f"{stem}_qc_artefacts.png").unlink(missing_ok=True)      # older versions wrote a PNG
         if qc.exists() and (not target.exists() or target.stat().st_mtime < qc.stat().st_mtime):
-            cls = np.array(Image.open(qc))
-            rgba = np.zeros((*cls.shape, 4), np.uint8)
-            rgba[..., :3] = QC_COLOURS[np.clip(cls, 0, 7)]
-            # show only artefacts: normal tissue, background and padding are transparent
-            rgba[..., 3] = np.where(np.isin(cls, [2, 3, 4, 5, 6]), 200, 0)
-            Image.fromarray(rgba, "RGBA").save(target)
+            st = ws / "status" / f"{r.slide_id}.json"
+            slide_mpp = json.loads(st.read_text()).get("mask", {}).get("info", {}).get("slide_mpp") if st.exists() else None
+            if slide_mpp:
+                write_qc_overlay(target, np.array(Image.open(qc)), qc_mpp / float(slide_mpp))
         if target.exists():
             n_ov += 1
     # viewer settings (keys read by the TIAToolbox viewer): colour by risk with blue-to-red, fixed tissue colours
@@ -80,14 +81,15 @@ def prepare(workspace: str | Path) -> Path:
         # RGBA: the viewer draws a class with only three values (RGB) fully transparent
         "color_dict": {"TUM": [220, 38, 38, 255], "NORM": [51, 160, 44, 255], "LYM": [106, 61, 154, 255],
                        "MUS": [247, 129, 191, 255], "STR": [255, 127, 0, 255], "DEB": [128, 128, 128, 255],
-                       "MUC": [102, 194, 219, 255], "ADI": [242, 217, 51, 255]},
+                       "MUC": [102, 194, 219, 255], "ADI": [242, 217, 51, 255],
+                       **{n: [*QC_COLOURS[k].tolist(), 255] for k, n in QC_NAMES.items()}},
     }, indent=1))
     (out / "README.txt").write_text(
         "Open with: himico view <workspace>  (or: tiatoolbox visualize --slides slides --overlays overlays)\n"
         "Overlays per slide:\n"
         "  *_insight_risk.db   INSIGHT local risk per patch; colour by 'insight_risk' (0 = lower, 1 = higher risk)\n"
         "  *_tissue_types.db   CRC tissue type per tile; colour by 'max_class'\n"
-        "  *_qc_artefacts.png  GrandQC artefacts: orange fold, green dark spot, red pen, pink edge/bubble, violet out of focus\n")
+        "  *_qc_artefacts.db   GrandQC artefact regions; colour by 'artefact' (orange fold, green dark spot, red pen, pink edge/bubble, violet out of focus)\n")
     return out
 
 

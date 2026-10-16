@@ -25,6 +25,37 @@ def write_overlay(path: Path, bounds_baseline: np.ndarray, values: np.ndarray, n
     store.close()
 
 
+QC_NAMES = {2: "fold", 3: "dark spot", 4: "pen", 5: "edge/bubble", 6: "out of focus"}   # GrandQC artefact classes
+
+
+def write_qc_overlay(path: Path, classes: np.ndarray, scale: float, min_area: int = 4):
+    """TIAToolbox annotation store of the GrandQC artefacts: one polygon per connected region with the property
+    `artefact` (fold, dark spot, pen, edge/bubble, out of focus). `classes` is the class map at qc_mpp and `scale`
+    converts its pixels to slide (baseline) pixels."""
+    import cv2
+    from shapely.geometry import Polygon
+    from tiatoolbox.annotation.storage import Annotation, SQLiteStore
+
+    anns = []
+    for k, name in QC_NAMES.items():
+        m = (classes == k).astype(np.uint8)
+        if not m.any():
+            continue
+        cnts, hier = cv2.findContours(m, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        for i, c in enumerate(cnts):
+            if hier[0][i][3] != -1 or len(c) < 3 or cv2.contourArea(c) < min_area:   # outer contours only; holes below
+                continue
+            holes = [h.reshape(-1, 2) * scale for j, h in enumerate(cnts)
+                     if hier[0][j][3] == i and len(h) >= 3 and cv2.contourArea(h) >= min_area]
+            poly = Polygon(c.reshape(-1, 2) * scale, holes)
+            if poly.is_valid and not poly.is_empty:
+                anns.append(Annotation(poly, {"artefact": name}))
+    store = SQLiteStore()
+    store.append_many(anns)
+    store.dump(str(path))
+    store.close()
+
+
 def write_heatmap(path: Path, bounds: np.ndarray, values: np.ndarray, max_side: int = 2000):
     """PNG heatmap (transparent background) from patch bounds at the feature resolution."""
     if not len(bounds):
