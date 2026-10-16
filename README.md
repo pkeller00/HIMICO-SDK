@@ -42,7 +42,7 @@ merged into one graph), for example `--patient-regex '^(TCGA-\w\w-\w{4})'`.
 The run is resumable: if it stops, run the same command again. Results are in `himico_runs/my_cohort/`:
 
 ```
-predictions/insight-crc/predictions.csv    one row per patient: risk, risk_group (High / Low), fold scores
+predictions/insight-crc/predictions.csv    one row per patient: risk and risk_group (High / Low)
 predictions/insight-crc/heatmaps/          patch-level risk drawn over each slide
 report.csv                                 per-slide status and any errors
 ```

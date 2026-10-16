@@ -122,7 +122,7 @@ class RemotePredictor(Predictor):
 
     def predict(self, graph) -> Prediction:
         r = _request(f"{self.base}/predict/{self.model}", dump_graph(_minimal(graph)), key=self.key)
-        known = {"patient_id", "score", "risk", "risk_group", "folds", "local"}
+        known = {"patient_id", "score", "risk", "risk_group", "threshold", "folds", "local"}
         extra = {k: v for k, v in r.items() if k not in known and not k.startswith("fold")}
         if "n_slides" in extra:
             extra["n_slides"] = len(getattr(graph, "slideOrder", []) or [1])

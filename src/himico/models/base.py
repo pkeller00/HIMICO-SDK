@@ -21,8 +21,7 @@ class Prediction:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def row(self) -> dict[str, Any]:
-        r = {"patient_id": self.patient, "score": self.score, "risk": self.risk, "risk_group": self.group}
-        r.update({f"fold{i + 1}_score": s for i, s in enumerate(self.folds)})
+        r = {"patient_id": self.patient, "risk": self.risk, "risk_group": self.group}
         r.update(self.extra)
         return r
 

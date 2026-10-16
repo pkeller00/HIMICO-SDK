@@ -159,7 +159,7 @@ class _Handler(BaseHTTPRequestHandler):
             model, lock = _State.model(name)
             with lock:
                 pred = model.predict(g)
-            body = {**pred.row(), "folds": pred.folds,
+            body = {**pred.row(), "score": pred.score, "folds": pred.folds,
                     "local": None if pred.local is None else np.round(pred.local, 5).tolist()}
             log.info("predict %s for key %s (%s)", name, acct.get("id", "-"), acct.get("tier"))
             return self._send(200, body)
